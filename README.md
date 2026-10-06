@@ -1,6 +1,6 @@
 # Orbit — All-in-one social dashboard
 
-A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger and TikTok from one calm workspace. Orbit always sends users to the official platform for sign-in; it does not embed, scrape, or imitate social websites.
+A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger and TikTok from one calm workspace. Orbit keeps you on this website and sends sign-in to the official platform. It does not copy login pages, scrape feeds, or bypass framing protections.
 
 ## Run locally
 
@@ -14,9 +14,11 @@ Without Supabase values, the app opens in a clearly labelled **preview workspace
 
 ## Security and integration boundaries
 
-- Social cards open the official websites in a new, isolated browser tab. The dashboard stays open so users can return when finished.
+- Each card opens an in-site workspace. Orbit tries to show the official page in that workspace. Facebook, WhatsApp, Messenger, and TikTok refuse to be framed, so the frame stays blank on purpose — Orbit does not proxy those sites or strip their security headers.
+- If a phone app swallows the Facebook or TikTok link, the workspace offers an explicit Chrome open on Android, and a same-tab open whose browser back button returns here.
+- WhatsApp and Messenger do not redirect back after login. The workspace stays on this website with **Orbit-এ ফিরুন**. Opening in the same tab also leaves a history entry so the browser back button returns to Orbit.
 - An external visit is **not** treated as an OAuth connection. Connection status stays “Not connected” until a real, verified provider callback is implemented.
-- No third-party password forms, hidden iframes, scraped pages, or attempts to bypass provider security are present.
+- No third-party password forms, scraped pages, or attempts to bypass provider security are present.
 - The registry records each provider’s supported official authorization method, documentation, supported features, and limits. Current integrations are safe external shortcuts plus implementation guidance—not live OAuth/API connections.
 - See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) before adding a provider API. Each integration needs its own reviewed provider app and a backend for token exchange and storage.
 

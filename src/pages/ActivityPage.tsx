@@ -49,9 +49,9 @@ export function ActivityPage({
               <article className="activity-row" key={entry.id}>
                 <span className="activity-timeline"><span /></span>
                 <BrandIcon integration={integration} size="mini" />
-                <div className="activity-row-copy"><strong>Opened {integration.name}</strong><span>Official website opened in a new tab · No account was linked to Orbit.</span></div>
+                <div className="activity-row-copy"><strong>{entry.action === 'returned' ? `Returned from ${integration.name}` : `Opened ${integration.name}`}</strong><span>{entry.action === 'returned' ? 'Back inside Orbit. The official login was not copied here.' : 'Opened inside Orbit. Sign-in stays on the official site.'}</span></div>
                 <span className="activity-time"><strong>{time}</strong><small>{date}</small></span>
-                <a href={integration.providerUrl} target="_blank" rel="noopener noreferrer" className="activity-open-again" onClick={() => onOpen(integration)} aria-label={`Open ${integration.name} again`}><ArrowUpRight size={16} /></a>
+                <button type="button" className="activity-open-again" onClick={() => onOpen(integration)} aria-label={`Open ${integration.name} inside Orbit`}><ArrowUpRight size={16} /></button>
               </article>
             );
           })}
@@ -71,7 +71,7 @@ export function ActivityPage({
             {['facebook', 'whatsapp', 'messenger', 'tiktok'].map((id) => {
               const integration = getIntegration(id as AppIntegration['id']);
               if (!integration) return null;
-              return <a key={id} href={integration.providerUrl} target="_blank" rel="noopener noreferrer" onClick={() => onOpen(integration)}><span>{integration.name}</span><ExternalLink size={13} /></a>;
+              return <button type="button" key={id} onClick={() => onOpen(integration)}><span>{integration.name}</span><ExternalLink size={13} /></button>;
             })}
           </div>
         </section>

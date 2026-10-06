@@ -13,9 +13,11 @@ import type { AppIntegration } from '../integrations/types';
 export function IntegrationDialog({
   integration,
   onClose,
+  onOpen,
 }: {
   integration: AppIntegration | null;
   onClose: () => void;
+  onOpen: (integration: AppIntegration) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -64,7 +66,7 @@ export function IntegrationDialog({
               <span className="status-dot" />
               {integration.status === 'connected' ? 'Connected' : 'Not connected to Orbit'}
             </span>
-            <span className="external-only-label"><ExternalLink size={13} /> Opens outside Orbit</span>
+            <span className="external-only-label"><ExternalLink size={13} /> Login stays on the official site</span>
           </div>
 
           <p className="dialog-intro">{integration.authorizationDetails}</p>
@@ -105,9 +107,9 @@ export function IntegrationDialog({
           <a href={integration.officialDocsUrl} target="_blank" rel="noopener noreferrer" className="button button-subtle">
             Read official docs <ArrowUpRight size={15} />
           </a>
-          <a href={integration.providerUrl} target="_blank" rel="noopener noreferrer" className="button button-primary">
-            Open {integration.name} <ArrowUpRight size={16} />
-          </a>
+          <button type="button" className="button button-primary" onClick={() => onOpen(integration)}>
+            Open inside Orbit <ArrowUpRight size={16} />
+          </button>
         </div>
       </section>
     </div>

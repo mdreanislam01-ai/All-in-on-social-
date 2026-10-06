@@ -30,7 +30,7 @@ export function IntegrationsPage({
         <div className="integration-banner-icon"><ShieldCheck size={21} /></div>
         <div className="integration-banner-copy">
           <strong>{connectedCount === 0 ? 'No social accounts are linked to this dashboard yet.' : `${connectedCount} social account${connectedCount === 1 ? '' : 's'} linked.`}</strong>
-          <span>Opening a platform keeps sign-in on its official website. API connections need their own approved OAuth setup; an external visit never changes connection status.</span>
+          <span>Sign-in stays on the official website. Facebook and TikTok block in-page frames, so Orbit keeps this page open and gives you a way back. An external visit never marks an API as connected.</span>
         </div>
         <div className="integration-banner-count"><strong>{connectedCount}<span> / {4}</span></strong><small>connected</small></div>
       </div>

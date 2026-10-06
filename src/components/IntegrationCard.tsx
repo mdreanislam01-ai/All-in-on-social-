@@ -29,17 +29,15 @@ export function IntegrationCard({
         <p>{integration.description}</p>
       </div>
       <div className="integration-card-footer">
-        <a
+        <button
+          type="button"
           className="button button-open"
-          href={integration.providerUrl}
-          target="_blank"
-          rel="noopener noreferrer"
           onClick={() => onOpen(integration)}
-          aria-label={`Open official ${integration.name} website in a new tab`}
+          aria-label={`Open ${integration.name} inside Orbit`}
         >
-          Open {integration.name}
+          Open inside
           <ArrowUpRight size={16} strokeWidth={2.2} />
-        </a>
+        </button>
         <button
           type="button"
           className="icon-button details-button"

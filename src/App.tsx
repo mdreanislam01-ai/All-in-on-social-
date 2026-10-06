@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './auth/AuthProvider';
+import { AppWorkspace } from './components/AppWorkspace';
 import { IntegrationDialog } from './components/IntegrationDialog';
 import { MobileNavigation, Sidebar, type ViewName } from './components/Sidebar';
 import { Toast, type ToastMessage } from './components/Toast';
 import { TopBar } from './components/TopBar';
-import { integrations } from './integrations/registry';
+import { getIntegration, integrations } from './integrations/registry';
+import {
+  assignWithReturn,
+  closeOfficialWindow,
+  consumeReturn,
+  isInAppBrowser,
+  isStandaloneDisplay,
+  openOfficialWindow,
+  peekReturn,
+  windowNameFor,
+  type LaunchHandle,
+} from './integrations/launch';
 import type { ActivityEntry, AppIntegration } from './integrations/types';
 import { usePwaInstall } from './hooks/usePwaInstall';
 import { ActivityPage } from './pages/ActivityPage';
@@ -14,6 +26,27 @@ import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 type ColorTheme = 'light' | 'dark';
+type SpaceId = AppIntegration['id'];
+
+function isSpaceId(value: string | null): value is SpaceId {
+  return value === 'facebook' || value === 'whatsapp' || value === 'messenger' || value === 'tiktok';
+}
+
+function readSpaceFromUrl(): SpaceId | null {
+  const value = new URLSearchParams(window.location.search).get('space');
+  return isSpaceId(value) ? value : null;
+}
+
+function writeSpace(id: SpaceId | null, mode: 'push' | 'replace') {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('space', id);
+  else url.searchParams.delete('space');
+  url.searchParams.delete('returned');
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  const state = id ? { orbitSpace: id } : {};
+  if (mode === 'push') window.history.pushState(state, '', next);
+  else window.history.replaceState(state, '', next);
+}
 
 function readSavedTheme(): ColorTheme {
   try {
@@ -29,6 +62,9 @@ export function App() {
   const [search, setSearch] = useState('');
   const [theme, setTheme] = useState<ColorTheme>(readSavedTheme);
   const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
+  const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
+  const [session, setSession] = useState<LaunchHandle | null>(null);
+  const [returned, setReturned] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -53,6 +89,43 @@ export function App() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [view]);
+
+  useEffect(() => {
+    const comingBack = peekReturn();
+    const fromUrl = readSpaceFromUrl();
+    const returnedFlag = new URLSearchParams(window.location.search).get('returned') === '1';
+    if (comingBack && (returnedFlag || fromUrl === comingBack.id)) {
+      consumeReturn();
+      setSpaceId(comingBack.id);
+      setReturned(true);
+      writeSpace(comingBack.id, 'replace');
+    } else if (fromUrl) {
+      setSpaceId(fromUrl);
+      setReturned(returnedFlag);
+    }
+
+    const onPopState = () => {
+      const next = readSpaceFromUrl();
+      setSpaceId(next);
+      setReturned(new URLSearchParams(window.location.search).get('returned') === '1');
+      if (!next) setSession(null);
+    };
+    const onPageShow = () => {
+      const pending = peekReturn();
+      if (!pending) return;
+      consumeReturn();
+      setSpaceId(pending.id);
+      setReturned(true);
+      setSession(null);
+      writeSpace(pending.id, 'replace');
+    };
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, []);
 
   useEffect(() => {
     const labels: Record<ViewName, string> = {
@@ -83,21 +156,82 @@ export function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 6200);
   }, []);
 
-  const handleOpenIntegration = useCallback((integration: AppIntegration) => {
+  const rememberActivity = useCallback((integration: AppIntegration, action: ActivityEntry['action']) => {
     setActivity((current) => [
       {
-        id: `${integration.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `${integration.id}-${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         integrationId: integration.id,
-        action: 'opened' as const,
+        action,
         createdAt: new Date().toISOString(),
       },
       ...current,
     ].slice(0, 30));
-    showToast({
-      title: `${integration.name} opened in a new tab`,
-      description: 'Sign in directly with the official platform, then return here whenever you’re ready.',
-    });
+  }, []);
+
+  const openSpace = useCallback((integration: AppIntegration) => {
+    setSelectedIntegration(null);
+    setReturned(false);
+    setSession(null);
+    setSpaceId(integration.id);
+    if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
+    rememberActivity(integration, 'opened');
+  }, [rememberActivity]);
+
+  const launchPopup = useCallback((integration: AppIntegration) => {
+    const handle = openOfficialWindow(integration.providerUrl, windowNameFor(integration.id));
+    setSession(handle);
+    setReturned(false);
+    if (handle.mode === 'blocked') {
+      showToast({
+        title: `${integration.name} ওপেন হয়নি`,
+        description: 'পপআপ ব্লক হয়েছে। Orbit-এর ভিতরের Chrome বা “এই ট্যাবে খুলুন” ব্যবহার করুন।',
+      });
+    }
   }, [showToast]);
+
+  const handleOpenIntegration = useCallback((integration: AppIntegration) => {
+    openSpace(integration);
+    const phone = window.matchMedia('(max-width: 760px)').matches || isInAppBrowser() || isStandaloneDisplay();
+    const staysForReturn = integration.id === 'whatsapp' || integration.id === 'messenger';
+    // On a phone, open the in-site workspace first. A raw new tab is what made
+    // Facebook/TikTok look closed and WhatsApp/Messenger never come back.
+    if (!phone && !staysForReturn) launchPopup(integration);
+  }, [launchPopup, openSpace]);
+
+  const handleLaunchSameTab = useCallback((integration: AppIntegration) => {
+    assignWithReturn(integration.id, integration.providerUrl);
+  }, []);
+
+  const handleReturn = useCallback((integration: AppIntegration) => {
+    closeOfficialWindow(session);
+    setSession(null);
+    setReturned(true);
+    window.focus();
+    rememberActivity(integration, 'returned');
+    showToast({
+      title: 'আপনি Orbit-এ ফিরে এসেছেন',
+      description: `${integration.name}-এর লগইন অফিসিয়াল সাইটেই থাকে। পাসওয়ার্ড এখানে আসে না।`,
+    });
+  }, [rememberActivity, session, showToast]);
+
+  const closeSpace = useCallback(() => {
+    if (window.history.state && 'orbitSpace' in window.history.state) {
+      window.history.back();
+      return;
+    }
+    writeSpace(null, 'replace');
+    setSpaceId(null);
+    setReturned(false);
+  }, []);
+
+  const navigate = useCallback((next: ViewName) => {
+    setView(next);
+    if (readSpaceFromUrl() || spaceId) {
+      writeSpace(null, 'replace');
+      setSpaceId(null);
+      setReturned(false);
+    }
+  }, [spaceId]);
 
   const handleToggleTheme = useCallback(() => {
     setTheme((current) => current === 'light' ? 'dark' : 'light');
@@ -138,7 +272,7 @@ export function App() {
     <div className="app-shell">
       <Sidebar
         view={view}
-        onNavigate={setView}
+        onNavigate={navigate}
         user={user}
         onSignOut={() => void handleSignOut()}
         onClose={() => setSidebarOpen(false)}
@@ -153,12 +287,22 @@ export function App() {
           onToggleTheme={handleToggleTheme}
           search={search}
           onSearchChange={setSearch}
-          onNavigate={setView}
+          onNavigate={navigate}
           onSignOut={() => void handleSignOut()}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
         <div className="main-scroll-area">
-          {view === 'overview' && (
+          {spaceId && getIntegration(spaceId) ? (
+            <AppWorkspace
+              integration={getIntegration(spaceId)!}
+              session={session}
+              returned={returned}
+              onLaunchPopup={() => launchPopup(getIntegration(spaceId)!)}
+              onLaunchSameTab={() => handleLaunchSameTab(getIntegration(spaceId)!)}
+              onReturn={() => handleReturn(getIntegration(spaceId)!)}
+              onClose={closeSpace}
+            />
+          ) : view === 'overview' && (
             <OverviewPage
               name={user.name}
               apps={filteredIntegrations}
@@ -169,7 +313,7 @@ export function App() {
               search={search.trim()}
             />
           )}
-          {view === 'integrations' && (
+          {!spaceId && view === 'integrations' && (
             <IntegrationsPage
               apps={filteredIntegrations}
               connectedCount={connectedCount}
@@ -178,14 +322,14 @@ export function App() {
               search={search.trim()}
             />
           )}
-          {view === 'activity' && (
+          {!spaceId && view === 'activity' && (
             <ActivityPage
               activity={activity}
               onClear={clearActivity}
               onOpen={handleOpenIntegration}
             />
           )}
-          {view === 'settings' && (
+          {!spaceId && view === 'settings' && (
             <SettingsPage
               user={user}
               authConfigured={authConfigured}
@@ -202,7 +346,7 @@ export function App() {
         </div>
         <MobileNavigation view={view} onNavigate={setView} />
       </main>
-      <IntegrationDialog integration={selectedIntegration} onClose={closeDialog} />
+      <IntegrationDialog integration={selectedIntegration} onClose={closeDialog} onOpen={handleOpenIntegration} />
       <Toast
         message={toast}
         onDismiss={() => setToast(null)}
