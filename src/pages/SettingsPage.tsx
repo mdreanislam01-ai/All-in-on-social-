@@ -106,7 +106,7 @@ export function SettingsPage({
             <div className="pwa-card-icon"><MonitorDown size={19} /></div>
             <span className="settings-overline">OPTIONAL INSTALL</span>
             <h2>Take Orbit with you</h2>
-            <p>Install this PWA for an app-like window and quick launch. You can keep using Orbit in your browser instead.</p>
+            <p>Install for quick launch, or keep using the browser. The browser back button is what brings you back here after WhatsApp or Messenger login.</p>
             {canInstall ? (
               <button type="button" className="button button-open pwa-install-button" onClick={onInstall}>Install Orbit <ArrowUpRight size={15} /></button>
             ) : (

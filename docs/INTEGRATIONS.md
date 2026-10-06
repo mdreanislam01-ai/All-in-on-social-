@@ -1,6 +1,6 @@
 # Official integration notes
 
-The current app was designed around provider-hosted authentication and documented APIs. The four cards intentionally open each official website. No full-site embedding is attempted. Provider/API connection statuses are not inferred from a browser visit.
+The current app was designed around provider-hosted authentication and documented APIs. Each card opens an in-site workspace and, from a user click, the official website. Full-site embedding is attempted only as a normal iframe. If the provider sends `X-Frame-Options` or `frame-ancestors` (Facebook, WhatsApp, Messenger, and TikTok all do), the frame is not shown and Orbit does not proxy the site or remove those headers. A visit is never treated as an API connection.
 
 ## Current service registry
 

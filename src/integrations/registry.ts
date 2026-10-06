@@ -23,7 +23,7 @@ export const integrations: AppIntegration[] = [
       'Graph API features approved for your app',
     ],
     limitations:
-      'This opens Facebook in its own browser experience. It does not embed the Facebook website or mirror a personal feed. Any in-dashboard data needs a reviewed Meta app and a secure server-side integration.',
+      'Facebook refuses to run inside another website’s frame, and phones often hand the link to the Facebook app, so the click looks like it did nothing. Orbit opens an in-site workspace instead of a blank frame, then sends you to the official site with a return button. It does not copy the login page or your password.',
     officialDocsUrl: 'https://developers.facebook.com/documentation/facebook-login/web',
     status: 'not-connected',
   },
@@ -43,7 +43,7 @@ export const integrations: AppIntegration[] = [
       'Webhooks and approved business workflows',
     ],
     limitations:
-      'The official Cloud API is a business messaging integration, not a consumer WhatsApp Web clone or personal inbox sync. A Meta business app, review, permissions, and a protected backend are required.',
+      'WhatsApp Web does not redirect back to another website after login, and it refuses to be embedded. Orbit keeps this page open so you can return after signing in on the official site. It is not a personal inbox copy.',
     officialDocsUrl:
       'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/overview',
     status: 'not-connected',
@@ -64,7 +64,7 @@ export const integrations: AppIntegration[] = [
       'Webhooks and supported message types',
     ],
     limitations:
-      'The official platform is designed for eligible Page conversations; it is not a personal Messenger inbox mirror. The Messenger website remains hosted by Meta and is opened separately.',
+      'Messenger does not send you back to another website after login, and it cannot be framed. Use Orbit’s return button, or open it in this tab and press the browser back button. This is not a personal inbox mirror.',
     officialDocsUrl: 'https://developers.facebook.com/documentation/business-messaging/messenger-platform',
     status: 'not-connected',
   },
@@ -84,7 +84,7 @@ export const integrations: AppIntegration[] = [
       'Display API data approved for your app',
     ],
     limitations:
-      'Available data depends on approved scopes and TikTok app review. This does not embed the TikTok website; TikTok stays in its own browser experience.',
+      'TikTok blocks embedding, so an in-page frame stays blank, and the phone app often swallows the link. Orbit opens a workspace on this website and a Chrome/official-window fallback, with a return button. It does not copy TikTok login.',
     officialDocsUrl: 'https://developers.tiktok.com/docs/en/login-kit-overview',
     status: 'not-connected',
   },

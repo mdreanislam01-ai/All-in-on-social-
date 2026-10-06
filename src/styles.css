@@ -313,8 +313,8 @@ button:disabled { cursor: not-allowed; }
 .activity-empty-card h2 { margin: 9px 0 6px; color: var(--text-strong); font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -.55px; }
 .activity-empty-card > p { max-width: 425px; margin: 0; color: var(--muted); font-size: 10.5px; line-height: 1.7; }
 .activity-quick-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 19px; }
-.activity-quick-links a { display: inline-flex; align-items: center; gap: 7px; min-height: 31px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); color: var(--muted-strong); font-size: 9px; font-weight: 600; text-decoration: none; transition: border-color .15s ease, color .15s ease, transform .15s ease; }
-.activity-quick-links a:hover { border-color: var(--line-strong); color: var(--accent-strong); transform: translateY(-1px); }
+.activity-quick-links a, .activity-quick-links button { display: inline-flex; align-items: center; gap: 7px; min-height: 31px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); color: var(--muted-strong); font-size: 9px; font-weight: 600; text-decoration: none; cursor: pointer; transition: border-color .15s ease, color .15s ease, transform .15s ease; }
+.activity-quick-links a:hover, .activity-quick-links button:hover { border-color: var(--line-strong); color: var(--accent-strong); transform: translateY(-1px); }
 .activity-privacy-footnote { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 11px 13px; border-radius: 10px; background: var(--surface-soft); color: var(--muted); font-size: 9px; }
 .activity-list { padding: 18px 20px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
 .activity-list-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 1px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 9px; }
@@ -330,7 +330,7 @@ button:disabled { cursor: not-allowed; }
 .activity-time { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--muted); }
 .activity-time strong { color: var(--muted-strong); font-size: 9px; font-weight: 600; }
 .activity-time small { font-size: 8px; }
-.activity-open-again { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); text-decoration: none; }
+.activity-open-again { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); text-decoration: none; cursor: pointer; }
 .activity-open-again:hover { border-color: var(--line-strong); background: var(--surface-soft); color: var(--accent-strong); }
 
 /* Settings */
@@ -665,7 +665,7 @@ button:disabled { cursor: not-allowed; }
   .activity-empty-card { padding: 26px 17px; }
   .activity-empty-card > p { font-size: 9.5px; }
   .activity-quick-links { gap: 5px; }
-  .activity-quick-links a { min-height: 28px; padding: 0 7px; font-size: 8px; }
+  .activity-quick-links a, .activity-quick-links button { min-height: 28px; padding: 0 7px; font-size: 8px; }
   .settings-layout { gap: 11px; }
   .settings-main-column, .settings-side-column { gap: 11px; }
   .settings-card { padding: 15px; }
@@ -715,6 +715,49 @@ button:disabled { cursor: not-allowed; }
   .page-content { padding-right: 13px; padding-left: 13px; }
   .theme-choice { flex-direction: column; align-items: flex-start; }
   .theme-choice-check { right: 5px; }
+}
+/* In-app platform workspace */
+.app-workspace { width: min(100%, 980px); }
+.workspace-top, .workspace-actions, .workspace-heading, .workspace-stage-bar { display: flex; align-items: center; }
+.workspace-top { justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.workspace-back { min-height: 34px; }
+.workspace-heading { align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.workspace-heading h1 { margin: 4px 0 6px; color: var(--text-strong); font-family: 'Manrope', 'DM Sans', sans-serif; font-size: clamp(28px, 3vw, 36px); font-weight: 800; letter-spacing: -1.4px; }
+.workspace-heading p { max-width: 620px; margin: 0; color: var(--muted-strong); font-size: 14px; line-height: 1.65; }
+.workspace-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.workspace-steps li { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted-strong); font-size: 12px; line-height: 1.4; }
+.workspace-steps span { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border-radius: 7px; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 800; }
+.workspace-actions { flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.workspace-actions .button { min-height: 40px; }
+.workspace-stage { overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-card); }
+.workspace-stage-bar { gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--card-accent) 8%, var(--surface)); }
+.workspace-stage-bar strong { color: var(--text-strong); font-size: 13px; }
+.workspace-stage-bar span { color: var(--muted); font-size: 11px; }
+.workspace-frame { display: block; width: 100%; height: min(68vh, 720px); border: 0; background: var(--surface-soft); }
+.workspace-probe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.workspace-fallback { position: relative; padding: 28px 26px 22px; }
+.workspace-fallback-icon { display: grid; width: 74px; height: 74px; margin-bottom: 14px; place-items: center; border-radius: 20px; }
+.workspace-fallback h2 { max-width: 680px; margin: 0 0 8px; color: var(--text-strong); font-family: 'Manrope', 'DM Sans', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -.4px; line-height: 1.35; }
+.workspace-fallback > p { max-width: 720px; margin: 0 0 10px; color: var(--muted-strong); font-size: 14px; line-height: 1.7; }
+.workspace-en { color: var(--muted) !important; font-size: 12px !important; }
+.workspace-alert, .workspace-welcome, .workspace-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 13px; border-radius: 14px; }
+.workspace-alert { border: 1px solid rgba(223, 113, 129, .35); background: rgba(223, 113, 129, .08); }
+.workspace-alert strong, .workspace-welcome strong { display: block; color: var(--text-strong); font-size: 13px; }
+.workspace-alert span, .workspace-welcome p, .workspace-note span { color: var(--muted-strong); font-size: 12px; line-height: 1.55; }
+.workspace-welcome { border: 1px solid rgba(49, 184, 135, .28); background: rgba(49, 184, 135, .1); }
+.workspace-welcome > span, .workspace-alert > strong { flex: 0 0 auto; }
+.workspace-welcome > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: rgba(49, 184, 135, .16); color: #1f9b70; }
+.workspace-waiting { border-color: color-mix(in srgb, var(--card-accent) 28%, var(--line)); background: color-mix(in srgb, var(--card-accent) 8%, var(--surface)); }
+.workspace-waiting > span { background: var(--surface); color: var(--card-accent); }
+.workspace-welcome p { margin: 3px 0 0; }
+.workspace-note { border: 1px solid var(--line); background: var(--surface-soft); color: #27aa7b; }
+.workspace-copy { margin-top: 12px; }
+@media (max-width: 760px) {
+  .workspace-steps { grid-template-columns: 1fr; }
+  .workspace-heading p, .workspace-fallback > p { font-size: 13px; }
+  .workspace-fallback { padding: 20px 16px 16px; }
+  .workspace-fallback h2 { font-size: 18px; }
+  .workspace-actions .button { flex: 1 1 calc(50% - 8px); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

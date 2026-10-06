@@ -22,6 +22,6 @@ export interface AppIntegration {
 export interface ActivityEntry {
   id: string;
   integrationId: AppIntegration['id'];
-  action: 'opened';
+  action: 'opened' | 'returned';
   createdAt: string;
 }
