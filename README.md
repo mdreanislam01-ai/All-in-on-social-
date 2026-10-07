@@ -1,6 +1,8 @@
 # Orbit — All-in-one social dashboard
 
-A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger and TikTok from one calm workspace. Orbit keeps you on this website and sends sign-in to the official platform. It does not copy login pages, scrape feeds, or bypass framing protections.
+A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger, TikTok and YouTube from one calm workspace.
+
+Every open control is a real `<a href>` to the official site. Orbit has no iframe, no proxy and no login form: the primary button opens in the same tab so the browser **Back** button brings you here, and a second button opens a new tab so Orbit stays visible. Bengali instructions live on the open screen.
 
 ## Run locally
 
@@ -12,12 +14,18 @@ npm run dev
 
 Without Supabase values, the app opens in a clearly labelled **preview workspace** with no password or account data stored. Before using real accounts or deploying for users, configure Supabase Auth as described below. Build with `npm run build`.
 
+`npm run verify:links` renders every card, dialog and open screen with `react-dom/server` and asserts the safety rules below (real href, no `target` on the primary, no iframe, no password field, `intent://` only inside an in-app browser). It needs no browser, so it is cheap to run in CI.
+
 ## Security and integration boundaries
 
-- Each card opens an in-site workspace. Orbit tries to show the official page in that workspace. Facebook, WhatsApp, Messenger, and TikTok refuse to be framed, so the frame stays blank on purpose — Orbit does not proxy those sites or strip their security headers.
-- If a phone app swallows the Facebook or TikTok link, the workspace offers an explicit Chrome open on Android, and a same-tab open whose browser back button returns here.
-- WhatsApp and Messenger do not redirect back after login. The workspace stays on this website with **Orbit-এ ফিরুন**. Opening in the same tab also leaves a history entry so the browser back button returns to Orbit.
-- An external visit is **not** treated as an OAuth connection. Connection status stays “Not connected” until a real, verified provider callback is implemented.
+- **No iframe, anywhere.** Facebook, WhatsApp, Messenger, TikTok and YouTube all refuse framing (`X-Frame-Options`, CSP `frame-ancestors`), so an embedded view can only ever be a broken grey box. Orbit does not proxy those sites, does not strip those headers, and never claims a provider "runs inside Orbit".
+- Primary button: `<a href="https://www.facebook.com/">` styled **`{name} খুলুন`**, same tab, no `target`, no `window.open`, no `intent://`. After login, one press of the browser Back button returns to this site.
+- Second button: **`নতুন ট্যাবে খুলুন`** with `target="_blank" rel="noopener noreferrer"`, so Orbit stays open. The open screen additionally keeps an in-page **`Orbit-এ ফিরুন`** control, which matters when Orbit is installed to a home screen and there is no Back button.
+- An Android `intent://…;package=com.android.chrome` link is offered **only** when this page is itself running inside an in-app browser (WhatsApp, Facebook, Instagram, TikTok) on Android — as an extra button, never the primary one, because a user already in Chrome gets nothing from it.
+- The official destinations are fixed: `facebook.com`, `web.whatsapp.com`, `messenger.com`, `tiktok.com`, `youtube.com`.
+- WhatsApp and Messenger never redirect back after login, so Orbit leaves its own history entry before a same-tab open from the open screen; a card link leaves Back exactly where it was.
+- An external visit is **not** treated as an OAuth connection. Connection status stays “Not connected” until a real, verified provider callback is implemented, and Activity records only that a local shortcut was clicked.
+- No password field for any provider exists. The only sign-in in the app is Orbit's own optional Supabase email-link flow.
 - No third-party password forms, scraped pages, or attempts to bypass provider security are present.
 - The registry records each provider’s supported official authorization method, documentation, supported features, and limits. Current integrations are safe external shortcuts plus implementation guidance—not live OAuth/API connections.
 - See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) before adding a provider API. Each integration needs its own reviewed provider app and a backend for token exchange and storage.
@@ -49,19 +57,26 @@ Vercel’s free **Hobby** tier is intended for personal, non-commercial use and 
 ## Project layout
 
 ```text
+scripts/              verify-open-links.tsx — SSR-rendered assertion harness (npm run verify:links)
 src/
   auth/                 First-party Supabase/email-link auth with preview fallback
   components/           Reusable app cards, provider marks, dialogs, nav, toast
   hooks/                PWA install prompt
-  integrations/         Typed integration registry and provider metadata
+  integrations/         Typed integration registry, provider metadata, link/return helpers
   pages/                Overview, integrations, activity, settings, sign-in
   App.tsx               App state and responsive shell
   styles.css            Theme tokens, responsive layouts, motion/accessibility
 public/
   icons/                App icon
   manifest.webmanifest  Optional installable PWA manifest
-  sw.js                 Small same-origin offline app-shell cache
+  sw.js                 Small same-origin offline app-shell cache (orbit-shell-v3)
 ```
+
+## Offline cache and releases
+
+`public/sw.js` caches only the app shell and is versioned (`orbit-shell-v3`). Bump `CACHE_NAME` on every release that changes the shell or the open behaviour: `activate` deletes every other cache, which is how a phone holding the old iframe build throws it away instead of serving it again. `src/main.tsx` also calls `registration.update()` after load so installs check for the new worker immediately instead of waiting for the browser's own polling.
+
+Bengali text uses Noto Sans Bengali (`@fontsource/noto-sans-bengali`) because DM Sans and Manrope have no Bengali glyphs; Bengali blocks are marked `lang="bn"` so line metrics and screen readers stay correct.
 
 ## Before turning on provider APIs
 

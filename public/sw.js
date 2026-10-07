@@ -1,4 +1,9 @@
-const CACHE_NAME = 'orbit-shell-v2';
+/*
+ * Bump this on every release that changes the shell or the social-open
+ * behaviour. Activation deletes every other cache, so a phone that still holds
+ * `orbit-shell-v2` (the iframe build) throws that copy away on next load.
+ */
+const CACHE_NAME = 'orbit-shell-v3';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/orbit-192.png', '/icons/orbit-512.png'];
 
 self.addEventListener('install', (event) => {

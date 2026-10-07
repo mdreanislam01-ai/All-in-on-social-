@@ -27,6 +27,12 @@ export function BrandIcon({
           <path d="m13.8 28.2 7-7.4c.7-.7 1.7-.9 2.6-.4l4.6 2.5c.4.2.8.2 1.1-.1l7.4-5.6c.7-.6 1.6.3 1 1l-7 7.4c-.7.7-1.7.9-2.6.4l-4.6-2.5c-.4-.2-.8-.2-1.1.1l-7.4 5.6c-.7.6-1.6-.3-1-1Z" fill="white" />
         </svg>
       )}
+      {integration.id === 'youtube' && (
+        <svg viewBox="0 0 48 48" className="youtube-glyph" focusable="false">
+          <rect x="3.5" y="11" width="41" height="26" rx="8" fill="currentColor" />
+          <path d="M20.2 18.4v11.2L30 24l-9.8-5.6Z" fill="#fff" />
+        </svg>
+      )}
       {integration.id === 'tiktok' && (
         <svg viewBox="0 0 48 48" className="tiktok-glyph" focusable="false">
           <path d="M29 7v22.2a8.3 8.3 0 1 1-7.1-8.2v6.2a2.5 2.5 0 1 0 1.3 2.2V7h5.8c.4 4.3 2.5 7.1 7 8.5v6.1c-2.7-.6-5.1-1.9-7-3.7V7Z" fill="#25f4ee" transform="translate(-1.6 1.4)" />

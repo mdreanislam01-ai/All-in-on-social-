@@ -56,13 +56,12 @@ export function AuthPage({
             <span className="auth-orbit-circle auth-circle-one" />
             <span className="auth-orbit-circle auth-circle-two" />
             <span className="auth-orbit-glow" />
-            <span className="auth-floating-app auth-float-fb"><BrandIcon integration={integrations[0]} size="regular" /></span>
-            <span className="auth-floating-app auth-float-wa"><BrandIcon integration={integrations[1]} size="regular" /></span>
-            <span className="auth-floating-app auth-float-ms"><BrandIcon integration={integrations[2]} size="regular" /></span>
-            <span className="auth-floating-app auth-float-tt"><BrandIcon integration={integrations[3]} size="regular" /></span>
+            {integrations.map((integration) => (
+              <span key={integration.id} className={`auth-floating-app auth-float-${integration.id}`}><BrandIcon integration={integration} size="regular" /></span>
+            ))}
             <span className="auth-orbit-spark auth-spark-a">✦</span><span className="auth-orbit-spark auth-spark-b">·</span>
           </div>
-          <div className="auth-story-footer"><span><ShieldCheck size={15} /> Official sign-in only</span><span>FACEBOOK · WHATSAPP · MESSENGER · TIKTOK</span></div>
+          <div className="auth-story-footer"><span><ShieldCheck size={15} /> Official sign-in only</span><span>{integrations.map((integration) => integration.name.toUpperCase()).join(' · ')}</span></div>
         </div>
       </section>
 
