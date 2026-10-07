@@ -107,9 +107,14 @@ export function IntegrationDialog({
           <a href={integration.officialDocsUrl} target="_blank" rel="noopener noreferrer" className="button button-subtle">
             Read official docs <ArrowUpRight size={15} />
           </a>
-          <button type="button" className="button button-primary" onClick={() => onOpen(integration)}>
-            Open inside Orbit <ArrowUpRight size={16} />
-          </button>
+          <a
+            href={integration.providerUrl}
+            className="button button-primary"
+            rel="noopener noreferrer"
+            onClick={() => onOpen(integration)}
+          >
+            Open {integration.name} <ArrowUpRight size={16} />
+          </a>
         </div>
       </section>
     </div>

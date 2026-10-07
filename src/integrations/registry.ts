@@ -23,7 +23,7 @@ export const integrations: AppIntegration[] = [
       'Graph API features approved for your app',
     ],
     limitations:
-      'Facebook refuses to run inside another website’s frame, and phones often hand the link to the Facebook app, so the click looks like it did nothing. Orbit opens an in-site workspace instead of a blank frame, then sends you to the official site with a return button. It does not copy the login page or your password.',
+      'Facebook refuses to run inside another website’s frame, so Orbit never frames, proxies, or mirrors it. The open screen hands you a real facebook.com link in the same tab (the browser back button returns to Orbit) or in a new tab. Orbit does not copy the login page and never asks for your password.',
     officialDocsUrl: 'https://developers.facebook.com/documentation/facebook-login/web',
     status: 'not-connected',
   },
@@ -43,7 +43,7 @@ export const integrations: AppIntegration[] = [
       'Webhooks and approved business workflows',
     ],
     limitations:
-      'WhatsApp Web does not redirect back to another website after login, and it refuses to be embedded. Orbit keeps this page open so you can return after signing in on the official site. It is not a personal inbox copy.',
+      'WhatsApp Web does not redirect back to another website after login and it refuses to be embedded. Orbit keeps this page in the tab history so the browser back button returns here after you sign in on the official site. It is not a personal inbox copy, and it never asks for your password.',
     officialDocsUrl:
       'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/overview',
     status: 'not-connected',
@@ -64,7 +64,7 @@ export const integrations: AppIntegration[] = [
       'Webhooks and supported message types',
     ],
     limitations:
-      'Messenger does not send you back to another website after login, and it cannot be framed. Use Orbit’s return button, or open it in this tab and press the browser back button. This is not a personal inbox mirror.',
+      'Messenger does not send you back to another website after login and it cannot be framed. Open it in this tab and press the browser back button to land back on this page, or open it in a new tab. This is not a personal inbox mirror, and Orbit never asks for your password.',
     officialDocsUrl: 'https://developers.facebook.com/documentation/business-messaging/messenger-platform',
     status: 'not-connected',
   },
@@ -84,7 +84,7 @@ export const integrations: AppIntegration[] = [
       'Display API data approved for your app',
     ],
     limitations:
-      'TikTok blocks embedding, so an in-page frame stays blank, and the phone app often swallows the link. Orbit opens a workspace on this website and a Chrome/official-window fallback, with a return button. It does not copy TikTok login.',
+      'TikTok blocks embedding, so an in-page frame would only ever be blank — Orbit never frames or proxies it. The open screen gives a real tiktok.com link in this tab (the browser back button returns to Orbit) or a new tab. An Android Chrome intent link appears only when Orbit itself is opened inside another app’s browser. It does not copy TikTok login.',
     officialDocsUrl: 'https://developers.tiktok.com/docs/en/login-kit-overview',
     status: 'not-connected',
   },

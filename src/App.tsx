@@ -7,15 +7,9 @@ import { Toast, type ToastMessage } from './components/Toast';
 import { TopBar } from './components/TopBar';
 import { getIntegration, integrations } from './integrations/registry';
 import {
-  assignWithReturn,
-  closeOfficialWindow,
   consumeReturn,
-  isInAppBrowser,
-  isStandaloneDisplay,
-  openOfficialWindow,
   peekReturn,
-  windowNameFor,
-  type LaunchHandle,
+  rememberDeparture,
 } from './integrations/launch';
 import type { ActivityEntry, AppIntegration } from './integrations/types';
 import { usePwaInstall } from './hooks/usePwaInstall';
@@ -63,7 +57,6 @@ export function App() {
   const [theme, setTheme] = useState<ColorTheme>(readSavedTheme);
   const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
   const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
-  const [session, setSession] = useState<LaunchHandle | null>(null);
   const [returned, setReturned] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -91,33 +84,39 @@ export function App() {
   }, [view]);
 
   useEffect(() => {
-    const comingBack = peekReturn();
-    const fromUrl = readSpaceFromUrl();
-    const returnedFlag = new URLSearchParams(window.location.search).get('returned') === '1';
-    if (comingBack && (returnedFlag || fromUrl === comingBack.id)) {
-      consumeReturn();
-      setSpaceId(comingBack.id);
+    // Coming back with the browser back button: the tab left for an official
+    // site and sessionStorage still remembers which one.
+    const welcomeBack = (pendingId: SpaceId) => {
+      setSpaceId(pendingId);
       setReturned(true);
-      writeSpace(comingBack.id, 'replace');
+      const integration = getIntegration(pendingId);
+      if (integration) rememberActivity(integration, 'returned');
+      showToast({
+        title: 'আপনি Orbit-এ ফিরে এসেছেন',
+        description: 'লগইন অফিসিয়াল সাইটেই থাকে। ভিজিট করলে অ্যাকাউন্ট connected হয় না।',
+      });
+    };
+
+    const pending = peekReturn();
+    const fromUrl = readSpaceFromUrl();
+    if (pending && (!fromUrl || fromUrl === pending.id)) {
+      consumeReturn();
+      welcomeBack(pending.id);
     } else if (fromUrl) {
       setSpaceId(fromUrl);
-      setReturned(returnedFlag);
     }
 
     const onPopState = () => {
       const next = readSpaceFromUrl();
       setSpaceId(next);
-      setReturned(new URLSearchParams(window.location.search).get('returned') === '1');
-      if (!next) setSession(null);
+      if (!next) setReturned(false);
     };
+    // bfcache restores the page without a fresh mount, so listen for it too.
     const onPageShow = () => {
-      const pending = peekReturn();
-      if (!pending) return;
+      const restored = peekReturn();
+      if (!restored) return;
       consumeReturn();
-      setSpaceId(pending.id);
-      setReturned(true);
-      setSession(null);
-      writeSpace(pending.id, 'replace');
+      welcomeBack(restored.id);
     };
     window.addEventListener('popstate', onPopState);
     window.addEventListener('pageshow', onPageShow);
@@ -125,6 +124,8 @@ export function App() {
       window.removeEventListener('popstate', onPopState);
       window.removeEventListener('pageshow', onPageShow);
     };
+    // Mount only: this decides what to show when the tab comes back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -168,51 +169,24 @@ export function App() {
     ].slice(0, 30));
   }, []);
 
+  /** Cards open Orbit's own open screen, which carries the real https links. */
   const openSpace = useCallback((integration: AppIntegration) => {
     setSelectedIntegration(null);
     setReturned(false);
-    setSession(null);
     setSpaceId(integration.id);
     if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
-    rememberActivity(integration, 'opened');
-  }, [rememberActivity]);
-
-  const launchPopup = useCallback((integration: AppIntegration) => {
-    const handle = openOfficialWindow(integration.providerUrl, windowNameFor(integration.id));
-    setSession(handle);
-    setReturned(false);
-    if (handle.mode === 'blocked') {
-      showToast({
-        title: `${integration.name} ওপেন হয়নি`,
-        description: 'পপআপ ব্লক হয়েছে। Orbit-এর ভিতরের Chrome বা “এই ট্যাবে খুলুন” ব্যবহার করুন।',
-      });
-    }
-  }, [showToast]);
-
-  const handleOpenIntegration = useCallback((integration: AppIntegration) => {
-    openSpace(integration);
-    const phone = window.matchMedia('(max-width: 760px)').matches || isInAppBrowser() || isStandaloneDisplay();
-    const staysForReturn = integration.id === 'whatsapp' || integration.id === 'messenger';
-    // On a phone, open the in-site workspace first. A raw new tab is what made
-    // Facebook/TikTok look closed and WhatsApp/Messenger never come back.
-    if (!phone && !staysForReturn) launchPopup(integration);
-  }, [launchPopup, openSpace]);
-
-  const handleLaunchSameTab = useCallback((integration: AppIntegration) => {
-    assignWithReturn(integration.id, integration.providerUrl);
   }, []);
 
-  const handleReturn = useCallback((integration: AppIntegration) => {
-    closeOfficialWindow(session);
-    setSession(null);
-    setReturned(true);
-    window.focus();
-    rememberActivity(integration, 'returned');
-    showToast({
-      title: 'আপনি Orbit-এ ফিরে এসেছেন',
-      description: `${integration.name}-এর লগইন অফিসিয়াল সাইটেই থাকে। পাসওয়ার্ড এখানে আসে না।`,
-    });
-  }, [rememberActivity, session, showToast]);
+  /**
+   * Fired when a person actually follows a link to an official site. The link
+   * itself does the navigating; this only records the local shortcut history
+   * and leaves a marker so the workspace can greet them on the way back.
+   */
+  const handleOpenOfficial = useCallback((integration: AppIntegration) => {
+    rememberDeparture(integration.id);
+    setReturned(false);
+    rememberActivity(integration, 'opened');
+  }, [rememberActivity]);
 
   const closeSpace = useCallback(() => {
     if (window.history.state && 'orbitSpace' in window.history.state) {
@@ -295,11 +269,8 @@ export function App() {
           {spaceId && getIntegration(spaceId) ? (
             <AppWorkspace
               integration={getIntegration(spaceId)!}
-              session={session}
               returned={returned}
-              onLaunchPopup={() => launchPopup(getIntegration(spaceId)!)}
-              onLaunchSameTab={() => handleLaunchSameTab(getIntegration(spaceId)!)}
-              onReturn={() => handleReturn(getIntegration(spaceId)!)}
+              onOpen={handleOpenOfficial}
               onClose={closeSpace}
             />
           ) : view === 'overview' && (
@@ -307,7 +278,7 @@ export function App() {
               name={user.name}
               apps={filteredIntegrations}
               connectedCount={connectedCount}
-              onOpen={handleOpenIntegration}
+              onOpen={openSpace}
               onDetails={setSelectedIntegration}
               onNavigate={() => setView('integrations')}
               search={search.trim()}
@@ -317,7 +288,7 @@ export function App() {
             <IntegrationsPage
               apps={filteredIntegrations}
               connectedCount={connectedCount}
-              onOpen={handleOpenIntegration}
+              onOpen={openSpace}
               onDetails={setSelectedIntegration}
               search={search.trim()}
             />
@@ -326,7 +297,7 @@ export function App() {
             <ActivityPage
               activity={activity}
               onClear={clearActivity}
-              onOpen={handleOpenIntegration}
+              onOpen={openSpace}
             />
           )}
           {!spaceId && view === 'settings' && (
@@ -346,11 +317,11 @@ export function App() {
         </div>
         <MobileNavigation view={view} onNavigate={setView} />
       </main>
-      <IntegrationDialog integration={selectedIntegration} onClose={closeDialog} onOpen={handleOpenIntegration} />
+      <IntegrationDialog integration={selectedIntegration} onClose={closeDialog} onOpen={handleOpenOfficial} />
       <Toast
         message={toast}
         onDismiss={() => setToast(null)}
-        onBack={() => { setToast(null); setView('overview'); }}
+        onBack={() => { setToast(null); navigate('overview'); }}
       />
     </div>
   );

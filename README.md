@@ -1,6 +1,6 @@
 # Orbit — All-in-one social dashboard
 
-A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger and TikTok from one calm workspace. Orbit keeps you on this website and sends sign-in to the official platform. It does not copy login pages, scrape feeds, or bypass framing protections.
+A responsive, PWA-ready browser dashboard for opening Facebook, WhatsApp, Messenger and TikTok from one calm workspace. Every open button is a real `https://` link to the official site. Orbit does not frame, proxy, or mirror those platforms, does not copy login pages, and does not bypass their framing protections.
 
 ## Run locally
 
@@ -12,13 +12,22 @@ npm run dev
 
 Without Supabase values, the app opens in a clearly labelled **preview workspace** with no password or account data stored. Before using real accounts or deploying for users, configure Supabase Auth as described below. Build with `npm run build`.
 
+## How opening a platform works
+
+Each card opens Orbit’s own open screen for that platform. There is no iframe anywhere in the app: Facebook, WhatsApp, Messenger and TikTok all send `X-Frame-Options` / CSP `frame-ancestors`, so a frame could only ever show “Your request couldn't be processed” or a blank page. The open screen instead shows two real links and Bengali instructions:
+
+| Button | Behaviour |
+| --- | --- |
+| **{name} খুলুন** | Plain `https://` link, same tab, no `target="_blank"`. Finish your work on the official site, then press the browser **Back** button to land back on this page. |
+| **নতুন ট্যাবে খুলুন** | Same `https://` link with `target="_blank" rel="noopener noreferrer"`, so Orbit stays open in its own tab. |
+| **Chrome-এ খুলুন** | Android Chrome `intent://` link, shown **only** when Orbit itself is opened inside another app’s browser (WhatsApp, Facebook, Instagram, TikTok, or an Android WebView). It always carries the `https://` URL as `S.browser_fallback_url`, so a device without Chrome still reaches the official site. |
+
 ## Security and integration boundaries
 
-- Each card opens an in-site workspace. Orbit tries to show the official page in that workspace. Facebook, WhatsApp, Messenger, and TikTok refuse to be framed, so the frame stays blank on purpose — Orbit does not proxy those sites or strip their security headers.
-- If a phone app swallows the Facebook or TikTok link, the workspace offers an explicit Chrome open on Android, and a same-tab open whose browser back button returns here.
-- WhatsApp and Messenger do not redirect back after login. The workspace stays on this website with **Orbit-এ ফিরুন**. Opening in the same tab also leaves a history entry so the browser back button returns to Orbit.
-- An external visit is **not** treated as an OAuth connection. Connection status stays “Not connected” until a real, verified provider callback is implemented.
-- No third-party password forms, scraped pages, or attempts to bypass provider security are present.
+- Orbit never frames, proxies, mirrors, or re-hosts a provider page, and it never strips `X-Frame-Options` or CSP `frame-ancestors`.
+- There are no third-party password forms and Orbit never asks for, reads, or stores a Facebook, WhatsApp, Messenger or TikTok password. Sign-in always happens on the official site.
+- An external visit is **not** treated as an OAuth connection. Connection status stays “Not connected” until a real, verified provider callback is implemented, and the open screen says so in Bengali as well.
+- No scraped pages, mirrored feeds, or attempts to bypass provider security are present.
 - The registry records each provider’s supported official authorization method, documentation, supported features, and limits. Current integrations are safe external shortcuts plus implementation guidance—not live OAuth/API connections.
 - See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) before adding a provider API. Each integration needs its own reviewed provider app and a backend for token exchange and storage.
 
@@ -60,7 +69,7 @@ src/
 public/
   icons/                App icon
   manifest.webmanifest  Optional installable PWA manifest
-  sw.js                 Small same-origin offline app-shell cache
+  sw.js                 Small same-origin offline app-shell cache (bump CACHE_NAME when deploying)
 ```
 
 ## Before turning on provider APIs

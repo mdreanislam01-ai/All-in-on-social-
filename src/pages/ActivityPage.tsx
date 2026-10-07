@@ -49,9 +49,9 @@ export function ActivityPage({
               <article className="activity-row" key={entry.id}>
                 <span className="activity-timeline"><span /></span>
                 <BrandIcon integration={integration} size="mini" />
-                <div className="activity-row-copy"><strong>{entry.action === 'returned' ? `Returned from ${integration.name}` : `Opened ${integration.name}`}</strong><span>{entry.action === 'returned' ? 'Back inside Orbit. The official login was not copied here.' : 'Opened inside Orbit. Sign-in stays on the official site.'}</span></div>
+                <div className="activity-row-copy"><strong>{entry.action === 'returned' ? `Returned from ${integration.name}` : `Opened ${integration.name}`}</strong><span>{entry.action === 'returned' ? 'Back on Orbit. The official login was never copied here.' : 'Followed the official link. Sign-in stayed on the official site.'}</span></div>
                 <span className="activity-time"><strong>{time}</strong><small>{date}</small></span>
-                <button type="button" className="activity-open-again" onClick={() => onOpen(integration)} aria-label={`Open ${integration.name} inside Orbit`}><ArrowUpRight size={16} /></button>
+                <button type="button" className="activity-open-again" onClick={() => onOpen(integration)} aria-label={`Open the ${integration.name} screen`}><ArrowUpRight size={16} /></button>
               </article>
             );
           })}

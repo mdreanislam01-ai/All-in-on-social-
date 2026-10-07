@@ -1,6 +1,6 @@
 # Official integration notes
 
-The current app was designed around provider-hosted authentication and documented APIs. Each card opens an in-site workspace and, from a user click, the official website. Full-site embedding is attempted only as a normal iframe. If the provider sends `X-Frame-Options` or `frame-ancestors` (Facebook, WhatsApp, Messenger, and TikTok all do), the frame is not shown and Orbit does not proxy the site or remove those headers. A visit is never treated as an API connection.
+The current app was designed around provider-hosted authentication and documented APIs. Each card opens Orbit’s own open screen, which hands the visitor two real `https://` links to the official website: one in the same tab (the browser back button returns to Orbit) and one in a new tab. **The app contains no iframe at all.** Facebook, WhatsApp, Messenger and TikTok all send `X-Frame-Options` or CSP `frame-ancestors`, so an embedded frame can only ever show a broken page; Orbit does not proxy those sites, does not remove or rewrite those headers, and does not ask for or store provider passwords. An Android Chrome `intent://` escape hatch is offered only when Orbit itself is displayed inside another app’s browser, and it always keeps the `https://` URL as `S.browser_fallback_url`. A visit is never treated as an API connection.
 
 ## Current service registry
 

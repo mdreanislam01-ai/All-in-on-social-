@@ -63,7 +63,7 @@ export function OverviewPage({
         <div className="welcome-hero-content">
           <div className="hero-eyebrow"><span><Sparkles size={13} /></span> YOUR SOCIALS, IN ONE ORBIT</div>
           <h2 id="welcome-title">Move between your<br className="hero-break" /> socials, <em>seamlessly.</em></h2>
-          <p>Open each platform from this page. If it cannot run in a frame, Orbit stays open so you can come back after sign-in.</p>
+          <p>Open each platform from this page. Sign-in always happens on the official site, and this page stays open for your return.</p>
           <button
             type="button"
             className="hero-cta"
@@ -93,7 +93,7 @@ export function OverviewPage({
         <span className="privacy-strip-icon"><ShieldCheck size={19} /></span>
         <div className="privacy-strip-copy">
           <strong>Privacy comes first</strong>
-          <span>Your passwords stay with each platform. Orbit never copies a login page. A return button stays here after sign-in.</span>
+          <span>Your passwords stay with each platform. Orbit never copies a login page — every open button is a real link to the official site.</span>
         </div>
         <button type="button" className="privacy-learn-more" onClick={() => onNavigate('integrations')}>
           How it works <ArrowRight size={15} />
@@ -105,7 +105,7 @@ export function OverviewPage({
           <div>
             <span className="section-overline">YOUR SOCIAL SPACE</span>
             <h2 id="apps-heading">Your apps</h2>
-            <p>Open a platform inside Orbit, then return here after sign-in.</p>
+            <p>Open a platform’s official site from here, then come back after sign-in.</p>
           </div>
           <button type="button" className="text-button manage-integrations" onClick={() => onNavigate('integrations')}>
             Manage integrations <ArrowRight size={15} />
