@@ -33,9 +33,10 @@ export function IntegrationCard({
           type="button"
           className="button button-open"
           onClick={() => onOpen(integration)}
-          aria-label={`Open ${integration.name} inside Orbit`}
+          aria-label={`Open the ${integration.name} screen`}
+          title={`Open the ${integration.name} screen with the official link`}
         >
-          Open inside
+          Open
           <ArrowUpRight size={16} strokeWidth={2.2} />
         </button>
         <button

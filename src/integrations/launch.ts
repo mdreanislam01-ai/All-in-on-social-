@@ -1,15 +1,5 @@
 import type { AppIntegration } from './types';
 
-export type LaunchMode = 'popup' | 'blocked';
-
-export interface LaunchHandle {
-  mode: LaunchMode;
-  windowName: string;
-  popup: Window | null;
-}
-
-const POPUP_FEATURES = 'popup=yes,width=1120,height=780,left=72,top=36';
-
 export function isAndroid(): boolean {
   return /Android/i.test(navigator.userAgent);
 }
@@ -18,81 +8,64 @@ export function isIos(): boolean {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-/** Installed home-screen mode has no browser back button, so return has to stay inside Orbit. */
+/** Installed / home-screen mode: outbound links open in a custom tab. */
 export function isStandaloneDisplay(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean };
   return window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: minimal-ui)').matches
     || window.matchMedia('(display-mode: fullscreen)').matches
     || nav.standalone === true;
 }
 
 /**
- * In-app browsers (Messenger, WhatsApp, TikTok, Instagram) often swallow
- * facebook.com and tiktok.com instead of navigating. WhatsApp Web and
- * Messenger can still open, which matches the reported split.
+ * True only when Orbit itself is being displayed inside another app's browser
+ * (WhatsApp, Facebook, Instagram, TikTok, Line, WeChat, or an Android WebView).
+ *
+ * The `intent://` escape hatch is offered there and nowhere else. When a person
+ * is already in Chrome, every open button stays a plain https:// link.
  */
 export function isInAppBrowser(): boolean {
-  return /FBAN|FBAV|Instagram|TikTok|Bytedance|Musical_ly|WhatsApp|Line\/|MicroMessenger/i.test(navigator.userAgent);
-}
-
-export function windowNameFor(id: AppIntegration['id']): string {
-  return `orbit-${id}`;
+  const ua = navigator.userAgent;
+  if (/FBAN|FBAV|FB4A|Instagram|TikTok|Bytedance|Musical_ly|Snapchat|WhatsApp|Line\/|MicroMessenger/i.test(ua)) {
+    return true;
+  }
+  // Android app WebViews add "; wv" to the UA. Chrome for Android does not.
+  return /Android/i.test(ua) && /;\s*wv\)/i.test(ua);
 }
 
 /**
- * Open the official site from a click handler.
- * Orbit keeps the window reference so it can focus or close that window and
- * bring the person back. This does not read the other site, proxy it, or
- * remove its framing protections.
+ * Android Chrome intent, used only as a secondary button inside another app's
+ * browser. It always carries the https URL as `S.browser_fallback_url`, so a
+ * device without Chrome still lands on the official site.
  */
-export function openOfficialWindow(url: string, name: string): LaunchHandle {
-  // Sized popups are fine on desktop. On phones they are often blocked or
-  // swallowed by app links, so use a plain window.open from the click instead.
-  const mobile = window.matchMedia('(max-width: 760px)').matches || isAndroid() || isIos();
-  const popup = window.open(url, mobile ? '_blank' : name, mobile ? undefined : POPUP_FEATURES);
-  if (!popup) {
-    return { mode: 'blocked', windowName: name, popup: null };
-  }
-  try {
-    popup.opener = null;
-  } catch {
-    // The local reference is still enough to focus or close the window.
-  }
-  return { mode: 'popup', windowName: name, popup };
-}
-
-export function focusOfficialWindow(handle: LaunchHandle | null): boolean {
-  if (!handle?.popup || handle.popup.closed) return false;
-  handle.popup.focus();
-  return true;
-}
-
-export function closeOfficialWindow(handle: LaunchHandle | null): void {
-  if (!handle?.popup || handle.popup.closed) return;
-  handle.popup.close();
-}
-
-/** Force Chrome on Android so Facebook/TikTok app links do not swallow the click. */
 export function androidChromeIntent(url: string): string {
   const stripped = url.replace(/^https?:\/\//, '');
   return `intent://${stripped}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
 }
 
+const RETURN_KEY = 'orbit-awaiting-return';
+const RETURN_TTL_MS = 1000 * 60 * 60 * 12;
+
+/**
+ * Remember that this tab left for an official site, so the workspace can greet
+ * the person when the browser back button brings them here. It is a local
+ * shortcut marker only — it is never treated as an account connection.
+ */
 export function rememberDeparture(id: AppIntegration['id']): void {
   try {
-    sessionStorage.setItem('orbit-awaiting-return', JSON.stringify({ id, at: Date.now() }));
+    sessionStorage.setItem(RETURN_KEY, JSON.stringify({ id, at: Date.now() }));
   } catch {
-    // Storage can be blocked; the in-page return button still works.
+    // Storage can be blocked; the page still works, just without the greeting.
   }
 }
 
 export function peekReturn(): { id: AppIntegration['id']; at: number } | null {
   try {
-    const raw = sessionStorage.getItem('orbit-awaiting-return');
+    const raw = sessionStorage.getItem(RETURN_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { id?: AppIntegration['id']; at?: number };
     if (!parsed.id || !parsed.at) return null;
-    if (Date.now() - parsed.at > 1000 * 60 * 60 * 12) return null;
+    if (Date.now() - parsed.at > RETURN_TTL_MS) return null;
     return { id: parsed.id, at: parsed.at };
   } catch {
     return null;
@@ -102,22 +75,9 @@ export function peekReturn(): { id: AppIntegration['id']; at: number } | null {
 export function consumeReturn(): AppIntegration['id'] | null {
   const pending = peekReturn();
   try {
-    sessionStorage.removeItem('orbit-awaiting-return');
+    sessionStorage.removeItem(RETURN_KEY);
   } catch {
     // Ignore.
   }
   return pending?.id ?? null;
-}
-
-export function assignWithReturn(id: AppIntegration['id'], url: string): void {
-  const returnUrl = new URL(window.location.href);
-  returnUrl.searchParams.set('space', id);
-  returnUrl.searchParams.set('returned', '1');
-  window.history.pushState(
-    { orbitSpace: id, orbitReturn: true },
-    '',
-    `${returnUrl.pathname}${returnUrl.search}${returnUrl.hash}`,
-  );
-  rememberDeparture(id);
-  window.location.assign(url);
 }
