@@ -1,23 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './auth/AuthProvider';
-import { AppWorkspace } from './components/AppWorkspace';
 import { IntegrationDialog } from './components/IntegrationDialog';
 import { MobileNavigation, Sidebar, type ViewName } from './components/Sidebar';
+import { OpenSpaceScreen } from './components/OpenSpaceScreen';
 import { Toast, type ToastMessage } from './components/Toast';
 import { TopBar } from './components/TopBar';
 import { getIntegration, integrations } from './integrations/registry';
-import {
-  assignWithReturn,
-  closeOfficialWindow,
-  consumeReturn,
-  isInAppBrowser,
-  isStandaloneDisplay,
-  openOfficialWindow,
-  peekReturn,
-  windowNameFor,
-  type LaunchHandle,
-} from './integrations/launch';
-import type { ActivityEntry, AppIntegration } from './integrations/types';
+import { clearReturn, peekReturn } from './integrations/launch';
+import type { ActivityEntry, AppIntegration, IntegrationId } from './integrations/types';
 import { usePwaInstall } from './hooks/usePwaInstall';
 import { ActivityPage } from './pages/ActivityPage';
 import { AuthPage } from './pages/AuthPage';
@@ -26,15 +16,17 @@ import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 type ColorTheme = 'light' | 'dark';
-type SpaceId = AppIntegration['id'];
+type SpaceId = IntegrationId;
 
-function isSpaceId(value: string | null): value is SpaceId {
-  return value === 'facebook' || value === 'whatsapp' || value === 'messenger' || value === 'tiktok';
-}
-
+/**
+ * Orbit owns exactly one piece of state per provider visit: which instruction
+ * screen is open, and whether the person just came back. Connection status
+ * lives in the registry and is never written from here, so a visit can never
+ * mark an account as connected.
+ */
 function readSpaceFromUrl(): SpaceId | null {
   const value = new URLSearchParams(window.location.search).get('space');
-  return isSpaceId(value) ? value : null;
+  return value && integrations.some((integration) => integration.id === value) ? (value as SpaceId) : null;
 }
 
 function writeSpace(id: SpaceId | null, mode: 'push' | 'replace') {
@@ -63,7 +55,6 @@ export function App() {
   const [theme, setTheme] = useState<ColorTheme>(readSavedTheme);
   const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
   const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
-  const [session, setSession] = useState<LaunchHandle | null>(null);
   const [returned, setReturned] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -90,66 +81,6 @@ export function App() {
     setSidebarOpen(false);
   }, [view]);
 
-  useEffect(() => {
-    const comingBack = peekReturn();
-    const fromUrl = readSpaceFromUrl();
-    const returnedFlag = new URLSearchParams(window.location.search).get('returned') === '1';
-    if (comingBack && (returnedFlag || fromUrl === comingBack.id)) {
-      consumeReturn();
-      setSpaceId(comingBack.id);
-      setReturned(true);
-      writeSpace(comingBack.id, 'replace');
-    } else if (fromUrl) {
-      setSpaceId(fromUrl);
-      setReturned(returnedFlag);
-    }
-
-    const onPopState = () => {
-      const next = readSpaceFromUrl();
-      setSpaceId(next);
-      setReturned(new URLSearchParams(window.location.search).get('returned') === '1');
-      if (!next) setSession(null);
-    };
-    const onPageShow = () => {
-      const pending = peekReturn();
-      if (!pending) return;
-      consumeReturn();
-      setSpaceId(pending.id);
-      setReturned(true);
-      setSession(null);
-      writeSpace(pending.id, 'replace');
-    };
-    window.addEventListener('popstate', onPopState);
-    window.addEventListener('pageshow', onPageShow);
-    return () => {
-      window.removeEventListener('popstate', onPopState);
-      window.removeEventListener('pageshow', onPageShow);
-    };
-  }, []);
-
-  useEffect(() => {
-    const labels: Record<ViewName, string> = {
-      overview: 'Overview',
-      integrations: 'Integrations',
-      activity: 'Activity',
-      settings: 'Settings',
-    };
-    document.title = `${labels[view]} · Orbit`;
-  }, [view]);
-
-  const connectedCount = useMemo(
-    () => integrations.filter((integration) => integration.status === 'connected').length,
-    [],
-  );
-
-  const filteredIntegrations = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return integrations;
-    return integrations.filter((integration) =>
-      `${integration.name} ${integration.description} ${integration.authorizationMethod}`.toLowerCase().includes(query),
-    );
-  }, [search]);
-
   const showToast = useCallback((message: ToastMessage) => {
     setToast(message);
     window.clearTimeout(toastTimer.current);
@@ -168,51 +99,91 @@ export function App() {
     ].slice(0, 30));
   }, []);
 
-  const openSpace = useCallback((integration: AppIntegration) => {
-    setSelectedIntegration(null);
-    setReturned(false);
-    setSession(null);
-    setSpaceId(integration.id);
-    if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
+  /**
+   * Landing back on Orbit after an official-site visit. Two signals, because
+   * phones do both: the history entry the open screen reserved (popstate with
+   * ?space&id&returned=1) and, after a real reload, the short-lived
+   * sessionStorage marker (pageshow). The first visit detection is also what
+   * fires when a card link is used — then there is no screen to reopen, just
+   * a quiet note on the dashboard. Neither path touches connection status.
+   */
+  const settleReturn = useCallback(() => {
+    const pending = peekReturn();
+    if (!pending) return;
+    const integration = getIntegration(pending.id);
+    clearReturn();
+    if (integration) rememberActivity(integration, 'returned');
+    if (integration && readSpaceFromUrl() === pending.id) {
+      setSpaceId(pending.id);
+      setReturned(true);
+      writeSpace(pending.id, 'replace');
+    } else if (integration) {
+      showToast({
+        title: `${integration.name} থেকে ফিরে এসেছেন`,
+        description: 'লগইন অফিসিয়াল সাইটেই আছে। Orbit কোনো পাসওয়ার্ড বা টোকেন পায়নি, তাই অ্যাকাউন্ট এখনো Not connected।',
+      });
+    }
+  }, [rememberActivity, showToast]);
+
+  useEffect(() => {
+    const fromUrl = readSpaceFromUrl();
+    const returnedFlag = new URLSearchParams(window.location.search).get('returned') === '1';
+    if (fromUrl) {
+      setSpaceId(fromUrl);
+      setReturned(returnedFlag);
+    }
+    settleReturn();
+
+    const onPopState = () => {
+      setSpaceId(readSpaceFromUrl());
+      setReturned(new URLSearchParams(window.location.search).get('returned') === '1');
+      settleReturn();
+    };
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('pageshow', settleReturn);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('pageshow', settleReturn);
+    };
+  }, [settleReturn]);
+
+  useEffect(() => {
+    const labels: Record<ViewName, string> = {
+      overview: 'Overview',
+      integrations: 'Integrations',
+      activity: 'Activity',
+      settings: 'Settings',
+    };
+    const openName = spaceId ? getIntegration(spaceId)?.name : null;
+    document.title = openName ? `${openName} · Orbit` : `${labels[view]} · Orbit`;
+  }, [view, spaceId]);
+
+  const connectedCount = useMemo(
+    () => integrations.filter((integration) => integration.status === 'connected').length,
+    [],
+  );
+
+  const filteredIntegrations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return integrations;
+    return integrations.filter((integration) =>
+      `${integration.name} ${integration.description} ${integration.descriptionBn} ${integration.authorizationMethod}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [search]);
+
+  /** A clicked open link is only a local shortcut record — never a login event. */
+  const markVisited = useCallback((integration: AppIntegration) => {
     rememberActivity(integration, 'opened');
   }, [rememberActivity]);
 
-  const launchPopup = useCallback((integration: AppIntegration) => {
-    const handle = openOfficialWindow(integration.providerUrl, windowNameFor(integration.id));
-    setSession(handle);
+  const openSpace = useCallback((integration: AppIntegration) => {
+    setSelectedIntegration(null);
     setReturned(false);
-    if (handle.mode === 'blocked') {
-      showToast({
-        title: `${integration.name} ওপেন হয়নি`,
-        description: 'পপআপ ব্লক হয়েছে। Orbit-এর ভিতরের Chrome বা “এই ট্যাবে খুলুন” ব্যবহার করুন।',
-      });
-    }
-  }, [showToast]);
-
-  const handleOpenIntegration = useCallback((integration: AppIntegration) => {
-    openSpace(integration);
-    const phone = window.matchMedia('(max-width: 760px)').matches || isInAppBrowser() || isStandaloneDisplay();
-    const staysForReturn = integration.id === 'whatsapp' || integration.id === 'messenger';
-    // On a phone, open the in-site workspace first. A raw new tab is what made
-    // Facebook/TikTok look closed and WhatsApp/Messenger never come back.
-    if (!phone && !staysForReturn) launchPopup(integration);
-  }, [launchPopup, openSpace]);
-
-  const handleLaunchSameTab = useCallback((integration: AppIntegration) => {
-    assignWithReturn(integration.id, integration.providerUrl);
+    setSpaceId(integration.id);
+    if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
   }, []);
-
-  const handleReturn = useCallback((integration: AppIntegration) => {
-    closeOfficialWindow(session);
-    setSession(null);
-    setReturned(true);
-    window.focus();
-    rememberActivity(integration, 'returned');
-    showToast({
-      title: 'আপনি Orbit-এ ফিরে এসেছেন',
-      description: `${integration.name}-এর লগইন অফিসিয়াল সাইটেই থাকে। পাসওয়ার্ড এখানে আসে না।`,
-    });
-  }, [rememberActivity, session, showToast]);
 
   const closeSpace = useCallback(() => {
     if (window.history.state && 'orbitSpace' in window.history.state) {
@@ -268,6 +239,8 @@ export function App() {
     );
   }
 
+  const activeIntegration = getIntegration(spaceId);
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -292,14 +265,11 @@ export function App() {
           onOpenSidebar={() => setSidebarOpen(true)}
         />
         <div className="main-scroll-area">
-          {spaceId && getIntegration(spaceId) ? (
-            <AppWorkspace
-              integration={getIntegration(spaceId)!}
-              session={session}
+          {activeIntegration ? (
+            <OpenSpaceScreen
+              integration={activeIntegration}
               returned={returned}
-              onLaunchPopup={() => launchPopup(getIntegration(spaceId)!)}
-              onLaunchSameTab={() => handleLaunchSameTab(getIntegration(spaceId)!)}
-              onReturn={() => handleReturn(getIntegration(spaceId)!)}
+              onVisit={markVisited}
               onClose={closeSpace}
             />
           ) : view === 'overview' && (
@@ -307,7 +277,8 @@ export function App() {
               name={user.name}
               apps={filteredIntegrations}
               connectedCount={connectedCount}
-              onOpen={handleOpenIntegration}
+              onVisit={markVisited}
+              onOpen={openSpace}
               onDetails={setSelectedIntegration}
               onNavigate={() => setView('integrations')}
               search={search.trim()}
@@ -317,7 +288,8 @@ export function App() {
             <IntegrationsPage
               apps={filteredIntegrations}
               connectedCount={connectedCount}
-              onOpen={handleOpenIntegration}
+              onVisit={markVisited}
+              onOpen={openSpace}
               onDetails={setSelectedIntegration}
               search={search.trim()}
             />
@@ -326,7 +298,7 @@ export function App() {
             <ActivityPage
               activity={activity}
               onClear={clearActivity}
-              onOpen={handleOpenIntegration}
+              onVisit={markVisited}
             />
           )}
           {!spaceId && view === 'settings' && (
@@ -346,11 +318,18 @@ export function App() {
         </div>
         <MobileNavigation view={view} onNavigate={setView} />
       </main>
-      <IntegrationDialog integration={selectedIntegration} onClose={closeDialog} onOpen={handleOpenIntegration} />
+      <IntegrationDialog
+        integration={selectedIntegration}
+        onClose={closeDialog}
+        onVisit={markVisited}
+        onGuide={openSpace}
+      />
       <Toast
         message={toast}
         onDismiss={() => setToast(null)}
-        onBack={() => { setToast(null); setView('overview'); }}
+        {...(spaceId
+          ? { onBack: () => { setToast(null); navigate('overview'); }, backLabel: 'ড্যাশবোর্ডে যান' }
+          : {})}
       />
     </div>
   );

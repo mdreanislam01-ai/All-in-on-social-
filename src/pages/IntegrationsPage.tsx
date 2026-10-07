@@ -1,16 +1,19 @@
 import { ArrowUpRight, Check, CircleHelp, ShieldCheck } from 'lucide-react';
 import { IntegrationCard } from '../components/IntegrationCard';
+import { integrations } from '../integrations/registry';
 import type { AppIntegration } from '../integrations/types';
 
 export function IntegrationsPage({
   apps,
   connectedCount,
+  onVisit,
   onOpen,
   onDetails,
   search,
 }: {
   apps: AppIntegration[];
   connectedCount: number;
+  onVisit: (integration: AppIntegration) => void;
   onOpen: (integration: AppIntegration) => void;
   onDetails: (integration: AppIntegration) => void;
   search: string;
@@ -21,7 +24,7 @@ export function IntegrationsPage({
         <div>
           <span className="eyebrow">YOUR SERVICE DIRECTORY</span>
           <h1>Integrations<span className="heading-period">.</span></h1>
-          <p>One reusable registry, four official ways into the apps you use.</p>
+          <p>One reusable registry, {integrations.length} official ways into the apps you use.</p>
         </div>
         <div className="page-heading-badge"><span className="heading-badge-icon"><Check size={14} /></span> {apps.length} official destinations</div>
       </div>
@@ -30,9 +33,10 @@ export function IntegrationsPage({
         <div className="integration-banner-icon"><ShieldCheck size={21} /></div>
         <div className="integration-banner-copy">
           <strong>{connectedCount === 0 ? 'No social accounts are linked to this dashboard yet.' : `${connectedCount} social account${connectedCount === 1 ? '' : 's'} linked.`}</strong>
-          <span>Sign-in stays on the official website. Facebook and TikTok block in-page frames, so Orbit keeps this page open and gives you a way back. An external visit never marks an API as connected.</span>
+          <span>Sign-in always stays on the official website. Every provider here blocks in-page frames, so Orbit shows a real link instead of a broken one — open it in this tab and use the Back button, or open a new tab and keep this page. An external visit never marks an API as connected.</span>
+          <span className="banner-note-bn" lang="bn">নতুন প্ল্যাটফর্ম যোগ করা শুধু registry-তে একটা এন্ট্রি — নিচের YouTube-টা সেভাবেই যোগ হয়েছে।</span>
         </div>
-        <div className="integration-banner-count"><strong>{connectedCount}<span> / {4}</span></strong><small>connected</small></div>
+        <div className="integration-banner-count"><strong>{connectedCount}<span> / {integrations.length}</span></strong><small>connected</small></div>
       </div>
 
       <div className="integration-info-row">
@@ -43,7 +47,7 @@ export function IntegrationsPage({
       {apps.length > 0 ? (
         <div className="integration-grid integration-grid-manage">
           {apps.map((integration) => (
-            <IntegrationCard key={integration.id} integration={integration} onOpen={onOpen} onDetails={onDetails} />
+            <IntegrationCard key={integration.id} integration={integration} onVisit={onVisit} onOpen={onOpen} onDetails={onDetails} />
           ))}
         </div>
       ) : (

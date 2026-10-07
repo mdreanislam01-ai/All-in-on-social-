@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { BrandIcon } from '../components/BrandIcon';
 import { IntegrationCard } from '../components/IntegrationCard';
+import { integrations } from '../integrations/registry';
 import type { AppIntegration } from '../integrations/types';
 
 function getGreeting() {
@@ -30,6 +31,7 @@ export function OverviewPage({
   name,
   apps,
   connectedCount,
+  onVisit,
   onOpen,
   onDetails,
   onNavigate,
@@ -38,6 +40,7 @@ export function OverviewPage({
   name: string;
   apps: AppIntegration[];
   connectedCount: number;
+  onVisit: (integration: AppIntegration) => void;
   onOpen: (integration: AppIntegration) => void;
   onDetails: (integration: AppIntegration) => void;
   onNavigate: (view: 'integrations') => void;
@@ -55,7 +58,7 @@ export function OverviewPage({
         </div>
         <div className="connection-summary">
           <span className="connection-summary-icon"><Check size={15} /></span>
-          <span><strong>{connectedCount} connected</strong><small>{4 - connectedCount} ready to open</small></span>
+          <span><strong>{connectedCount} connected</strong><small>{integrations.length - connectedCount} ready to open</small></span>
         </div>
       </div>
 
@@ -63,7 +66,8 @@ export function OverviewPage({
         <div className="welcome-hero-content">
           <div className="hero-eyebrow"><span><Sparkles size={13} /></span> YOUR SOCIALS, IN ONE ORBIT</div>
           <h2 id="welcome-title">Move between your<br className="hero-break" /> socials, <em>seamlessly.</em></h2>
-          <p>Open each platform from this page. If it cannot run in a frame, Orbit stays open so you can come back after sign-in.</p>
+          <p>Every card is a real link to the official site — no frames, no proxies, no copied login pages. Open in this tab and press Back to return, or open in a new tab and Orbit stays right here.</p>
+          <p className="hero-note-bn" lang="bn">Orbit কোনো পাসওয়ার্ড চায় না; লগইন সবসময় প্রতিটি প্ল্যাটফর্মের নিজের সাইটেই হয়।</p>
           <button
             type="button"
             className="hero-cta"
@@ -80,10 +84,8 @@ export function OverviewPage({
           <span className="hero-star hero-star-one">✦</span>
           <span className="hero-star hero-star-two">✦</span>
           <span className="hero-star hero-star-three">·</span>
-          {[apps.find((app) => app.id === 'facebook'), apps.find((app) => app.id === 'whatsapp'), apps.find((app) => app.id === 'messenger'), apps.find((app) => app.id === 'tiktok')]
-            .filter((app): app is AppIntegration => Boolean(app))
-            .map((app) => <span key={app.id} className={`hero-app-float float-${app.id}`}><BrandIcon integration={app} size="mini" /></span>)}
-          <div className="orbit-caption"><span className="orbit-caption-dot" />4 PLATFORMS READY</div>
+          {apps.map((app) => <span key={app.id} className={`hero-app-float float-${app.id}`}><BrandIcon integration={app} size="mini" /></span>)}
+          <div className="orbit-caption"><span className="orbit-caption-dot" />{integrations.length} PLATFORMS READY</div>
         </div>
         <span className="hero-decor hero-decor-one" aria-hidden="true" />
         <span className="hero-decor hero-decor-two" aria-hidden="true" />
@@ -93,7 +95,7 @@ export function OverviewPage({
         <span className="privacy-strip-icon"><ShieldCheck size={19} /></span>
         <div className="privacy-strip-copy">
           <strong>Privacy comes first</strong>
-          <span>Your passwords stay with each platform. Orbit never copies a login page. A return button stays here after sign-in.</span>
+          <span>Your passwords stay with each platform. Orbit never copies a login page, and opening a site never marks that account as connected.</span>
         </div>
         <button type="button" className="privacy-learn-more" onClick={() => onNavigate('integrations')}>
           How it works <ArrowRight size={15} />
@@ -105,7 +107,7 @@ export function OverviewPage({
           <div>
             <span className="section-overline">YOUR SOCIAL SPACE</span>
             <h2 id="apps-heading">Your apps</h2>
-            <p>Open a platform inside Orbit, then return here after sign-in.</p>
+            <p>বোতামে চাপলেই অফিসিয়াল সাইট খুলবে — লগইন শেষে ব্যাক বাটনে এই পেজে ফিরে আসবেন।</p>
           </div>
           <button type="button" className="text-button manage-integrations" onClick={() => onNavigate('integrations')}>
             Manage integrations <ArrowRight size={15} />
@@ -115,14 +117,14 @@ export function OverviewPage({
         {apps.length > 0 ? (
           <div className="integration-grid">
             {apps.map((integration) => (
-              <IntegrationCard key={integration.id} integration={integration} onOpen={onOpen} onDetails={onDetails} />
+              <IntegrationCard key={integration.id} integration={integration} onVisit={onVisit} onOpen={onOpen} onDetails={onDetails} />
             ))}
           </div>
         ) : (
           <div className="search-empty-state">
             <span className="search-empty-icon"><ExternalLink size={19} /></span>
             <strong>No apps match “{search}”</strong>
-            <p>Try searching Facebook, WhatsApp, Messenger, or TikTok.</p>
+            <p>Try searching Facebook, WhatsApp, Messenger, TikTok, or YouTube.</p>
             <button type="button" className="text-button" onClick={() => onNavigate('integrations')}>View all integrations <ArrowUpRight size={15} /></button>
           </div>
         )}

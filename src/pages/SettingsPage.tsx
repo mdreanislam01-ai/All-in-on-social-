@@ -88,8 +88,8 @@ export function SettingsPage({
 
         <div className="settings-side-column">
           <section className="settings-card connected-settings-card">
-            <div className="settings-card-heading"><div><span className="settings-overline">SOCIAL ACCOUNTS</span><h2>Connections</h2></div><span className="settings-connected-count">0 / 4</span></div>
-            <p className="settings-card-intro">Opening a service is separate from linking its API to Orbit.</p>
+            <div className="settings-card-heading"><div><span className="settings-overline">SOCIAL ACCOUNTS</span><h2>Connections</h2></div><span className="settings-connected-count">0 / {integrations.length}</span></div>
+            <p className="settings-card-intro" lang="bn">সাইট খোলা আর API কানেকশন দুই আলাদা জিনিস — শুধু ভিজিট করলে কোনো অ্যাকাউন্ট connected হয় না।</p>
             <div className="settings-integration-list">
               {integrations.map((integration) => (
                 <div className="settings-integration-row" key={integration.id}>
@@ -106,7 +106,7 @@ export function SettingsPage({
             <div className="pwa-card-icon"><MonitorDown size={19} /></div>
             <span className="settings-overline">OPTIONAL INSTALL</span>
             <h2>Take Orbit with you</h2>
-            <p>Install for quick launch, or keep using the browser. The browser back button is what brings you back here after WhatsApp or Messenger login.</p>
+            <p>Install for quick launch, or keep using the browser. The browser Back button is what brings you here after signing in on the official site — in installed app mode there is no Back button, so use “নতুন ট্যাবে খুলুন”.</p>
             {canInstall ? (
               <button type="button" className="button button-open pwa-install-button" onClick={onInstall}>Install Orbit <ArrowUpRight size={15} /></button>
             ) : (

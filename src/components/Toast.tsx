@@ -9,10 +9,13 @@ export function Toast({
   message,
   onDismiss,
   onBack,
+  backLabel = 'Back to Orbit',
 }: {
   message: ToastMessage | null;
   onDismiss: () => void;
-  onBack: () => void;
+  /** Optional: shown only when there is somewhere useful to jump back to. */
+  onBack?: () => void;
+  backLabel?: string;
 }) {
   if (!message) return null;
 
@@ -23,9 +26,11 @@ export function Toast({
         <strong>{message.title}</strong>
         <span>{message.description}</span>
       </div>
-      <button type="button" className="toast-back" onClick={onBack}>
-        <ArrowLeft size={14} /> Back to Orbit
-      </button>
+      {onBack && (
+        <button type="button" className="toast-back" onClick={onBack}>
+          <ArrowLeft size={14} /> {backLabel}
+        </button>
+      )}
       <button type="button" className="toast-close" onClick={onDismiss} aria-label="Dismiss message">
         <X size={16} />
       </button>

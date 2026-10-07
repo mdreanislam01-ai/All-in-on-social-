@@ -1,14 +1,19 @@
-import { ArrowUpRight, Info } from 'lucide-react';
 import type { CSSProperties } from 'react';
+import { Info } from 'lucide-react';
 import { BrandIcon } from './BrandIcon';
+import { OpenSiteLink } from './OpenSiteLink';
 import type { AppIntegration } from '../integrations/types';
 
 export function IntegrationCard({
   integration,
+  onVisit,
   onOpen,
   onDetails,
 }: {
   integration: AppIntegration;
+  /** Fires when the real link is activated; Orbit never touches the session. */
+  onVisit: (integration: AppIntegration) => void;
+  /** Opens Orbit's own instruction screen — the only screen Orbit owns. */
   onOpen: (integration: AppIntegration) => void;
   onDetails: (integration: AppIntegration) => void;
 }) {
@@ -26,17 +31,23 @@ export function IntegrationCard({
       </div>
       <div className="integration-copy">
         <h3>{integration.name}</h3>
-        <p>{integration.description}</p>
+        <p lang="bn">{integration.descriptionBn}</p>
       </div>
       <div className="integration-card-footer">
+        <OpenSiteLink
+          integration={integration}
+          mode="same-tab"
+          className="button button-open"
+          onVisit={onVisit}
+        />
         <button
           type="button"
-          className="button button-open"
+          className="button button-quiet button-guides"
           onClick={() => onOpen(integration)}
-          aria-label={`Open ${integration.name} inside Orbit`}
+          lang="bn"
+          title="কীভাবে খুলব ও ফিরব — নির্দেশনা"
         >
-          Open inside
-          <ArrowUpRight size={16} strokeWidth={2.2} />
+          নির্দেশনা
         </button>
         <button
           type="button"

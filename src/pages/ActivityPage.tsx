@@ -1,23 +1,23 @@
 import { useMemo } from 'react';
 import {
-  ArrowUpRight,
   Clock3,
-  ExternalLink,
   History,
   Trash2,
 } from 'lucide-react';
 import { BrandIcon } from '../components/BrandIcon';
-import { getIntegration } from '../integrations/registry';
+import { OpenSiteLink } from '../components/OpenSiteLink';
+import { getIntegration, integrations } from '../integrations/registry';
+
 import type { ActivityEntry, AppIntegration } from '../integrations/types';
 
 export function ActivityPage({
   activity,
   onClear,
-  onOpen,
+  onVisit,
 }: {
   activity: ActivityEntry[];
   onClear: () => void;
-  onOpen: (integration: AppIntegration) => void;
+  onVisit: (integration: AppIntegration) => void;
 }) {
   const orderedActivity = useMemo(
     () => [...activity].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
@@ -30,7 +30,7 @@ export function ActivityPage({
         <div>
           <span className="eyebrow">YOUR RECENT JOURNEY</span>
           <h1>Activity<span className="heading-period">.</span></h1>
-          <p>A lightweight, on-device record of platforms you opened from Orbit.</p>
+          <p>A lightweight, on-device record of the links you opened from Orbit. It is not proof of a login, and it never marks an account as connected.</p>
         </div>
         {orderedActivity.length > 0 && (
           <button type="button" className="button button-quiet clear-activity" onClick={onClear}><Trash2 size={15} /> Clear history</button>
@@ -49,9 +49,9 @@ export function ActivityPage({
               <article className="activity-row" key={entry.id}>
                 <span className="activity-timeline"><span /></span>
                 <BrandIcon integration={integration} size="mini" />
-                <div className="activity-row-copy"><strong>{entry.action === 'returned' ? `Returned from ${integration.name}` : `Opened ${integration.name}`}</strong><span>{entry.action === 'returned' ? 'Back inside Orbit. The official login was not copied here.' : 'Opened inside Orbit. Sign-in stays on the official site.'}</span></div>
+                <div className="activity-row-copy"><strong>{entry.action === 'returned' ? `${integration.name} থেকে ফিরে এসেছেন` : `${integration.name} খোলা হয়েছে`}</strong><span>{entry.action === 'returned' ? 'ব্যাক বাটনে এই পেজে ফেরা। লগইনের কোনো কপি এখানে আসেনি।' : 'অফিসিয়াল সাইটে আসল লিংক খোলা হয়েছে; লগইন সেখানেই হয়।'}</span></div>
                 <span className="activity-time"><strong>{time}</strong><small>{date}</small></span>
-                <button type="button" className="activity-open-again" onClick={() => onOpen(integration)} aria-label={`Open ${integration.name} inside Orbit`}><ArrowUpRight size={16} /></button>
+                <OpenSiteLink integration={integration} mode="same-tab" className="activity-open-again" withIcon={false} onVisit={onVisit} label="আবার" />
               </article>
             );
           })}
@@ -65,19 +65,17 @@ export function ActivityPage({
             <span className="activity-art-paper"><History size={31} strokeWidth={1.5} /></span>
           </div>
           <span className="empty-overline"><Clock3 size={13} /> YOUR SPACE IS ALL CAUGHT UP</span>
-          <h2>Nothing here just yet.</h2>
-          <p>When you open a platform from Orbit, you’ll see a small reminder here. This history stays in this browser session and never tracks activity inside another app.</p>
+          <h2>এখনো কিছু খোলা হয়নি।</h2>
+          <p lang="bn">Orbit থেকে কোনো প্ল্যাটফর্ম খুললে এখানে একটা ছোট রেকর্ড থাকবে। এটি শুধু এই ব্রাউজার সেশনেই — অন্য অ্যাপের ভিতরে আপনি কী করছেন তা Orbit দেখে না।</p>
           <div className="activity-quick-links">
-            {['facebook', 'whatsapp', 'messenger', 'tiktok'].map((id) => {
-              const integration = getIntegration(id as AppIntegration['id']);
-              if (!integration) return null;
-              return <button type="button" key={id} onClick={() => onOpen(integration)}><span>{integration.name}</span><ExternalLink size={13} /></button>;
-            })}
+            {integrations.map((integration) => (
+              <OpenSiteLink key={integration.id} integration={integration} mode="same-tab" className="quick-open" withIcon={false} onVisit={onVisit} />
+            ))}
           </div>
         </section>
       )}
 
-      <div className="activity-privacy-footnote"><History size={15} /> This is a local shortcut history only — Orbit cannot see what you do after you leave for a platform.</div>
+      <div className="activity-privacy-footnote"><History size={15} /> এটি শুধু লোকাল শর্টকাট হিস্ট্রি — অফিসিয়াল সাইটে চলে গেলে সেখানে আপনি কী করবেন তা Orbit জানে না।</div>
     </div>
   );
 }

@@ -1,16 +1,24 @@
 import type { AppIntegration } from './types';
 
 /**
- * The integration registry is the single source of truth for app cards,
- * activity, settings, and the integration details dialog. Provider status is
- * intentionally not inferred from an external-site visit: only a verified
- * OAuth/API callback should ever change it to `connected`.
+ * The integration registry is the single source of truth for app cards, the
+ * open screen, activity, settings and the details dialog.
+ *
+ * Rules this file must keep honouring:
+ * - `providerUrl` is the real, official HTTPS address. Every open button in the
+ *   UI renders it as a plain `<a href>` — no iframe, no proxy, no service worker
+ *   trickery, and no attempt to strip `X-Frame-Options` or `frame-ancestors`.
+ * - Provider status is never inferred from a visit. Only a verified OAuth/API
+ *   callback may change it to `connected`, and no adapter for that exists yet.
+ * - Nothing here collects or stores a social password, and Orbit ships no login
+ *   form for any of these providers.
  */
 export const integrations: AppIntegration[] = [
   {
     id: 'facebook',
     name: 'Facebook',
-    description: 'Connect and access supported Facebook features',
+    description: 'Open facebook.com; Facebook Login stays on Meta’s site',
+    descriptionBn: 'facebook.com আসল লিংকে খুলুন — লগইন সবসময় Facebook-এর নিজের সাইটে।',
     providerUrl: 'https://www.facebook.com/',
     accent: '#1877f2',
     softAccent: '#edf4ff',
@@ -23,14 +31,17 @@ export const integrations: AppIntegration[] = [
       'Graph API features approved for your app',
     ],
     limitations:
-      'Facebook refuses to run inside another website’s frame, and phones often hand the link to the Facebook app, so the click looks like it did nothing. Orbit opens an in-site workspace instead of a blank frame, then sends you to the official site with a return button. It does not copy the login page or your password.',
+      'Facebook refuses to run inside another website’s frame, so an embedded view can only ever be blank, and a phone often hands the link to the Facebook app. Orbit does not fight either behaviour: it links straight to facebook.com and leaves the browser Back button as your way home. No login page is copied and no password is collected.',
+    openNoteBn: 'ফোন চাইলে লিংকটা নিজের Facebook অ্যাপে নিয়ে যেতে পারে — সেখানেও লগইন অফিসিয়ালই থাকে।',
+    returnNoteBn: 'লগইন শেষে ব্রাউজারের ব্যাক বাটন চাপলেই এই পেজে ফিরে আসবেন।',
     officialDocsUrl: 'https://developers.facebook.com/documentation/facebook-login/web',
     status: 'not-connected',
   },
   {
     id: 'whatsapp',
     name: 'WhatsApp',
-    description: 'Connect and access supported WhatsApp features',
+    description: 'Open WhatsApp Web; sign-in and QR stay on WhatsApp',
+    descriptionBn: 'web.whatsapp.com খুলুন — QR মিলানো ও লগইন শুধু WhatsApp-এর নিজের সাইটে।',
     providerUrl: 'https://web.whatsapp.com/',
     accent: '#20b968',
     softAccent: '#eaf8f0',
@@ -43,7 +54,9 @@ export const integrations: AppIntegration[] = [
       'Webhooks and approved business workflows',
     ],
     limitations:
-      'WhatsApp Web does not redirect back to another website after login, and it refuses to be embedded. Orbit keeps this page open so you can return after signing in on the official site. It is not a personal inbox copy.',
+      'WhatsApp Web will not be framed and does not redirect back to another website after sign-in; on a phone browser it asks for a desktop or the app. Orbit only hands you the official address, so nothing here mirrors a personal inbox. This entry is a shortcut, not WhatsApp Business Platform access.',
+    openNoteBn: 'মোবাইল ব্রাউজারকে WhatsApp Web প্রায়ই ডেস্কটপ চাইতে বলে। চল না গেলে “নতুন ট্যাবে খুলুন” বা ফোনের WhatsApp অ্যাপ ব্যবহার করুন।',
+    returnNoteBn: 'WhatsApp লগইনের পর নিজের সাইটেই থাকে, ফেরত পাঠায় না — তাই ব্যাক বাটন চাপুন।',
     officialDocsUrl:
       'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/overview',
     status: 'not-connected',
@@ -51,7 +64,8 @@ export const integrations: AppIntegration[] = [
   {
     id: 'messenger',
     name: 'Messenger',
-    description: 'Connect and access supported Messenger features',
+    description: 'Open messenger.com; Page tooling stays on Meta’s site',
+    descriptionBn: 'messenger.com খুলুন — লগইন ও ইনবক্স শুধু Meta-র নিজের সাইটেই।',
     providerUrl: 'https://www.messenger.com/',
     accent: '#0866ff',
     softAccent: '#edf3ff',
@@ -64,14 +78,17 @@ export const integrations: AppIntegration[] = [
       'Webhooks and supported message types',
     ],
     limitations:
-      'Messenger does not send you back to another website after login, and it cannot be framed. Use Orbit’s return button, or open it in this tab and press the browser back button. This is not a personal inbox mirror.',
+      'Messenger blocks embedding and does not send you back to another website after login, which is why an in-page frame showed a broken request instead of a chat. Orbit links to messenger.com and keeps this page open as your way back. It is not a personal inbox mirror.',
+    openNoteBn: 'মেসেঞ্জার লগইন শেষে আপনার সাইটে ফেরত পাঠায় না; এই ট্যাবে থাকলে ব্যাক বাটনে ফিরবেন, নতুন ট্যাব দিলে Orbit খোলাই থাকবে।',
+    returnNoteBn: 'এই পেজ বন্ধ হচ্ছে না — চাইলে “নতুন ট্যাবে খুলুন” বেছে নিন।',
     officialDocsUrl: 'https://developers.facebook.com/documentation/business-messaging/messenger-platform',
     status: 'not-connected',
   },
   {
     id: 'tiktok',
     name: 'TikTok',
-    description: 'Connect and access supported TikTok features',
+    description: 'Open tiktok.com; TikTok Login Kit stays on TikTok',
+    descriptionBn: 'tiktok.com খুলুন — লগইন সবসময় TikTok-এর নিজের সাইটে বা অ্যাপে।',
     providerUrl: 'https://www.tiktok.com/',
     accent: '#161823',
     softAccent: '#f0f1f4',
@@ -84,12 +101,38 @@ export const integrations: AppIntegration[] = [
       'Display API data approved for your app',
     ],
     limitations:
-      'TikTok blocks embedding, so an in-page frame stays blank, and the phone app often swallows the link. Orbit opens a workspace on this website and a Chrome/official-window fallback, with a return button. It does not copy TikTok login.',
+      'TikTok blocks embedding, so a frame inside this site stays blank, and the installed app frequently intercepts the tap so it looks like nothing happened. Orbit links to tiktok.com directly; when you arrived here from another app’s built-in browser, an extra “Chrome” link is offered. TikTok login is never reproduced.',
+    openNoteBn: 'TikTok বা Instagram-এর ভিতরের ব্রাউজার থেকে এসে থাকলে লিংক অ্যাপে চলে যেতে পারে; সেক্ষেত্রে নিচের Chrome লিংকটা ব্যবহার করুন।',
+    returnNoteBn: 'লগইন শেষে ব্যাক বাটন চাপলে Orbit-এর এই পেজ পাবেন।',
     officialDocsUrl: 'https://developers.tiktok.com/docs/en/login-kit-overview',
+    status: 'not-connected',
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    description: 'Open youtube.com; Google OAuth covers the YouTube APIs',
+    descriptionBn: 'youtube.com খুলুন — Google লগইন শুধু youtube.com/Google-এর নিজের সাইটে।',
+    providerUrl: 'https://www.youtube.com/',
+    accent: '#ff0033',
+    softAccent: '#ffeff1',
+    authorizationMethod: 'Google Identity Services · OAuth 2.0 + YouTube Data API v3',
+    authorizationDetails:
+      'YouTube API access is authorized with OAuth 2.0 through a Google Cloud project and its consent screen. YouTube Data API v3 reads and writes channel, playlist and video resources; YouTube Analytics and Reporting APIs need extra scopes and an approved quota.',
+    supportedFeatures: [
+      'Official Google-hosted sign-in and consent',
+      'Data API v3 calls limited to the granted scopes',
+      'YouTube Analytics and Reporting APIs once approved',
+    ],
+    limitations:
+      'youtube.com will not render inside another website’s frame; the only supported embed is the official video player, which is a player and not the site or a login page. Orbit therefore links to youtube.com itself. Visiting it does not authorize a Google account for any API.',
+    openNoteBn: 'Google অ্যাকাউন্টের লগইন লাগলে সেটা youtube.com-এর নিজের পেজেই করুন। Orbit কোনো Google পাসওয়ার্ড বা টোকেন দেখে না, রাখে না।',
+    returnNoteBn: 'লগইন শেষে ব্যাক বাটন চাপলে এই পেজে ফিরে আসবেন, অথবা নতুন ট্যাব বেছে নিন।',
+    officialDocsUrl: 'https://developers.google.com/youtube/v3/getting-started',
     status: 'not-connected',
   },
 ];
 
-export function getIntegration(id: AppIntegration['id']): AppIntegration | undefined {
+export function getIntegration(id: string | null | undefined): AppIntegration | undefined {
+  if (!id) return undefined;
   return integrations.find((integration) => integration.id === id);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  ArrowRight,
   ArrowUpRight,
   Check,
   ExternalLink,
@@ -8,16 +9,19 @@ import {
   X,
 } from 'lucide-react';
 import { BrandIcon } from './BrandIcon';
+import { OpenSiteLink } from './OpenSiteLink';
 import type { AppIntegration } from '../integrations/types';
 
 export function IntegrationDialog({
   integration,
   onClose,
-  onOpen,
+  onVisit,
+  onGuide,
 }: {
   integration: AppIntegration | null;
   onClose: () => void;
-  onOpen: (integration: AppIntegration) => void;
+  onVisit: (integration: AppIntegration) => void;
+  onGuide: (integration: AppIntegration) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -45,7 +49,7 @@ export function IntegrationDialog({
           <div className="dialog-app-heading">
             <BrandIcon integration={integration} size="regular" />
             <div>
-              <span className="dialog-kicker">OFFICIAL INTEGRATION</span>
+              <span className="dialog-kicker">OFFICIAL SITE SHORTCUT</span>
               <h2 id="integration-dialog-title">{integration.name}</h2>
             </div>
           </div>
@@ -66,7 +70,7 @@ export function IntegrationDialog({
               <span className="status-dot" />
               {integration.status === 'connected' ? 'Connected' : 'Not connected to Orbit'}
             </span>
-            <span className="external-only-label"><ExternalLink size={13} /> Login stays on the official site</span>
+            <span className="external-only-label"><ExternalLink size={13} /> Real link, official sign-in</span>
           </div>
 
           <p className="dialog-intro">{integration.authorizationDetails}</p>
@@ -97,19 +101,32 @@ export function IntegrationDialog({
           <div className="dialog-setup-note">
             <div className="setup-note-icon"><ShieldCheck size={18} /></div>
             <div>
-              <strong>Sign in directly with {integration.name}</strong>
-              <p>Orbit never asks for, sees, or stores your social password. Visiting the official site does not mark this API integration as connected.</p>
+              <strong lang="bn">লগইন শুধু {integration.name}-এর নিজের সাইটে</strong>
+              <p lang="bn">Orbit কখনো আপনার {integration.name} পাসওয়ার্ড চায় না, দেখে না বা সেভ করে না। ফ্রেম বা নকল লগইন পেজও এখানে নেই — শুধু {integration.providerUrl} ঠিকানার আসল লিংক।</p>
             </div>
           </div>
+
+          <button type="button" className="text-button dialog-guide-link" onClick={() => onGuide(integration)}>
+            খোলার নিয়ম ও ফেরার উপায় দেখুন <ArrowRight size={14} />
+          </button>
         </div>
 
         <div className="dialog-footer">
           <a href={integration.officialDocsUrl} target="_blank" rel="noopener noreferrer" className="button button-subtle">
-            Read official docs <ArrowUpRight size={15} />
+            Official docs <ArrowUpRight size={15} />
           </a>
-          <button type="button" className="button button-primary" onClick={() => onOpen(integration)}>
-            Open inside Orbit <ArrowUpRight size={16} />
-          </button>
+          <OpenSiteLink
+            integration={integration}
+            mode="new-tab"
+            className="button button-subtle"
+            onVisit={onVisit}
+          />
+          <OpenSiteLink
+            integration={integration}
+            mode="same-tab"
+            className="button button-primary"
+            onVisit={onVisit}
+          />
         </div>
       </section>
     </div>
