@@ -1,5 +1,3 @@
-import type { IntegrationId } from '../integrations/types';
-
 export type SiteCategory =
   | 'Social'
   | 'Messaging'
@@ -17,22 +15,15 @@ export interface DirectorySite {
   domain: string;
   monogram: string;
   accent: string;
-  integrationId?: IntegrationId;
   featured?: boolean;
 }
 
-/**
- * A small, hand-curated directory for Orbit's social-first workspace.
- * Destinations point to the services' public home pages; descriptions and
- * visual marks are original to Orbit rather than copied from the directory
- * used as a design reference.
- */
+/** Orbit's own curated list. Each entry points to the service's public home page. */
 export const directorySites: DirectorySite[] = [
   {
     id: 'facebook', name: 'Facebook', category: 'Social',
     description: 'Keep up with friends, groups, pages, and the communities you follow.',
-    url: 'https://www.facebook.com/', domain: 'facebook.com', monogram: 'f', accent: '#3984f5',
-    integrationId: 'facebook', featured: true,
+    url: 'https://www.facebook.com/', domain: 'facebook.com', monogram: 'f', accent: '#3984f5', featured: true,
   },
   {
     id: 'instagram', name: 'Instagram', category: 'Social',
@@ -47,8 +38,7 @@ export const directorySites: DirectorySite[] = [
   {
     id: 'tiktok', name: 'TikTok', category: 'Social',
     description: 'Explore short-form video, new voices, and creative trends.',
-    url: 'https://www.tiktok.com/', domain: 'tiktok.com', monogram: 'tt', accent: '#42d8d0',
-    integrationId: 'tiktok', featured: true,
+    url: 'https://www.tiktok.com/', domain: 'tiktok.com', monogram: 'tt', accent: '#42d8d0', featured: true,
   },
   {
     id: 'linkedin', name: 'LinkedIn', category: 'Social',
@@ -68,7 +58,7 @@ export const directorySites: DirectorySite[] = [
   {
     id: 'threads', name: 'Threads', category: 'Social',
     description: 'Join text-first conversations connected to the Instagram community.',
-    url: 'https://www.threads.net/', domain: 'threads.net', monogram: 'th', accent: '#e5e7f1',
+    url: 'https://www.threads.net/', domain: 'threads.net', monogram: 'th', accent: '#111418',
   },
   {
     id: 'bluesky', name: 'Bluesky', category: 'Social',
@@ -83,14 +73,12 @@ export const directorySites: DirectorySite[] = [
   {
     id: 'whatsapp', name: 'WhatsApp', category: 'Messaging',
     description: 'Message people and groups, or continue in the official WhatsApp Web app.',
-    url: 'https://web.whatsapp.com/', domain: 'web.whatsapp.com', monogram: 'wa', accent: '#29bd78',
-    integrationId: 'whatsapp', featured: true,
+    url: 'https://web.whatsapp.com/', domain: 'web.whatsapp.com', monogram: 'wa', accent: '#29bd78', featured: true,
   },
   {
     id: 'messenger', name: 'Messenger', category: 'Messaging',
     description: 'Pick up conversations and calls in Meta’s dedicated messaging service.',
-    url: 'https://www.messenger.com/', domain: 'messenger.com', monogram: 'ms', accent: '#4889f7',
-    integrationId: 'messenger', featured: true,
+    url: 'https://www.messenger.com/', domain: 'messenger.com', monogram: 'ms', accent: '#4889f7', featured: true,
   },
   {
     id: 'telegram', name: 'Telegram', category: 'Messaging',
@@ -125,8 +113,7 @@ export const directorySites: DirectorySite[] = [
   {
     id: 'youtube', name: 'YouTube', category: 'Video & audio',
     description: 'Watch channels, tutorials, live streams, and videos from around the world.',
-    url: 'https://www.youtube.com/', domain: 'youtube.com', monogram: 'yt', accent: '#ff4b5e',
-    integrationId: 'youtube', featured: true,
+    url: 'https://www.youtube.com/', domain: 'youtube.com', monogram: 'yt', accent: '#ff4b5e', featured: true,
   },
   {
     id: 'twitch', name: 'Twitch', category: 'Video & audio',

@@ -1,429 +1,246 @@
+import { ArrowUp, Bookmark, Info, Menu, RotateCcw, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bookmark } from 'lucide-react';
-import { useAuth } from './auth/AuthProvider';
 import { AboutDialog } from './components/AboutDialog';
 import { BookmarkDrawer } from './components/BookmarkDrawer';
-import { DirectoryHeader } from './components/DirectoryHeader';
-import { IntegrationDialog } from './components/IntegrationDialog';
-import { OpenSpaceScreen } from './components/OpenSpaceScreen';
-import { Toast, type ToastMessage } from './components/Toast';
-import { consumeReturn, SWALLOWED_TAP_MS } from './integrations/launch';
-import { getIntegration, integrations } from './integrations/registry';
-import type { ActivityEntry, AppIntegration, IntegrationId } from './integrations/types';
-import { usePwaInstall } from './hooks/usePwaInstall';
-import { directorySites, getDirectorySite, type DirectorySite } from './directory/catalog';
-import type { ViewName } from './components/Sidebar';
-import { ActivityPage } from './pages/ActivityPage';
-import { AuthPage } from './pages/AuthPage';
-import { DirectoryPage } from './pages/DirectoryPage';
-import { IntegrationsPage } from './pages/IntegrationsPage';
-import { SettingsPage } from './pages/SettingsPage';
+import { Pagination } from './components/Pagination';
+import { SiteCard } from './components/SiteCard';
+import { countByCategory, filterSites, PAGE_SIZE, ALL_CATEGORIES, type CategoryFilter } from './directory/filter';
+import { directoryCategories, directorySites, type SiteCategory } from './directory/catalog';
+import { readBookmarks, writeBookmarks } from './lib/storage';
 
-type ColorTheme = 'light' | 'dark';
-type SpaceId = IntegrationId;
-
-function readSpaceFromUrl(): SpaceId | null {
-  const value = new URLSearchParams(window.location.search).get('space');
-  return value && integrations.some((integration) => integration.id === value) ? (value as SpaceId) : null;
-}
-
-function writeSpace(id: SpaceId | null, mode: 'push' | 'replace') {
-  const url = new URL(window.location.href);
-  if (id) url.searchParams.set('space', id);
-  else url.searchParams.delete('space');
-  url.searchParams.delete('returned');
-  const next = `${url.pathname}${url.search}${url.hash}`;
-  const state = id ? { orbitSpace: id } : {};
-  if (mode === 'push') window.history.pushState(state, '', next);
-  else window.history.replaceState(state, '', next);
-}
-
-function readSavedTheme(): ColorTheme {
-  try {
-    return localStorage.getItem('orbit-theme') === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
-
-function readSavedSiteIds(): string[] {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem('orbit-saved-sites') ?? '[]');
-    if (!Array.isArray(value)) return [];
-    return [...new Set(value.filter((id): id is string =>
-      typeof id === 'string' && directorySites.some((site) => site.id === id),
-    ))];
-  } catch {
-    return [];
-  }
-}
+const ALL_IDS = new Set(directorySites.map((site) => site.id));
+const COUNTS = countByCategory();
 
 export function App() {
-  const { user, loading, authConfigured, signInWithEmail, continueAsDemo, signOut } = useAuth();
-  const [view, setView] = useState<ViewName>('overview');
-  const [search, setSearch] = useState('');
-  const [directoryReset, setDirectoryReset] = useState(0);
-  const [theme, setTheme] = useState<ColorTheme>(readSavedTheme);
-  const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
-  const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
-  const [returned, setReturned] = useState(false);
-  const [helpAutoOpen, setHelpAutoOpen] = useState(false);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [savedSiteIds, setSavedSiteIds] = useState<string[]>(readSavedSiteIds);
-  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [category, setCategory] = useState<CategoryFilter>(ALL_CATEGORIES);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [bookmarkIds, setBookmarkIds] = useState<string[]>(() => readBookmarks(ALL_IDS));
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-  const toastTimer = useRef<number | undefined>(undefined);
-  const { canInstall, install } = usePwaInstall();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0b0a1b' : '#f6f7fb');
-    try {
-      localStorage.setItem('orbit-theme', theme);
-    } catch {
-      // A blocked storage API should not prevent the interface from working.
-    }
-  }, [theme]);
+    writeBookmarks(bookmarkIds);
+  }, [bookmarkIds]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('orbit-saved-sites', JSON.stringify(savedSiteIds));
-    } catch {
-      // Bookmarks remain usable for this session if storage is unavailable.
-    }
-  }, [savedSiteIds]);
+    document.title = 'Orbit — Social directory';
+  }, []);
 
+  // Escape closes whichever layer is open; the browser Back button is left alone.
   useEffect(() => {
-    const syncSavedSites = (event: StorageEvent) => {
-      if (event.key === 'orbit-saved-sites') setSavedSiteIds(readSavedSiteIds());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      setDrawerOpen(false);
+      setAboutOpen(false);
     };
-    window.addEventListener('storage', syncSavedSites);
-    return () => window.removeEventListener('storage', syncSavedSites);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
-
-  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
-
-  const showToast = useCallback((message: ToastMessage) => {
-    setToast(message);
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 6200);
-  }, []);
-
-  const rememberActivity = useCallback((siteId: string, action: ActivityEntry['action']) => {
-    const site = getDirectorySite(siteId);
-    if (!site) return;
-    setActivity((current) => [
-      {
-        id: `${siteId}-${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        siteId,
-        action,
-        createdAt: new Date().toISOString(),
-      },
-      ...current,
-    ].slice(0, 30));
-  }, []);
-
-  /** A provider visit is not an OAuth callback and never changes connection status. */
-  const markVisited = useCallback((integration: AppIntegration) => {
-    rememberActivity(integration.id, 'opened');
-  }, [rememberActivity]);
-
-  const markSiteVisited = useCallback((site: DirectorySite) => {
-    rememberActivity(site.id, 'opened');
-  }, [rememberActivity]);
-
-  const settleReturn = useCallback(() => {
-    const pending = consumeReturn();
-    if (!pending) return;
-    const integration = getIntegration(pending.id);
-    if (!integration) return;
-    rememberActivity(pending.id, 'returned');
-    if (pending.awayMs < SWALLOWED_TAP_MS) {
-      setHelpAutoOpen(true);
-      setSpaceId(pending.id);
-      setReturned(false);
-      writeSpace(pending.id, 'replace');
-      showToast({
-        title: `${integration.name} খোলেনি বলে মনে হচ্ছে`,
-        description: 'সাইটে যাওয়ার আগেই ফিরে এসেছেন — ফোন সম্ভবত লিংকটা গিলে ফেলেছে। নিচের “খুলতে সমস্যা হচ্ছে?” ধাপগুলো দেখুন।',
-      });
-    } else if (readSpaceFromUrl() === pending.id) {
-      setSpaceId(pending.id);
-      setReturned(true);
-      writeSpace(pending.id, 'replace');
-    } else {
-      showToast({
-        title: `${integration.name} থেকে ফিরে এসেছেন`,
-        description: 'লগইন অফিসিয়াল সাইটেই আছে। Orbit কোনো পাসওয়ার্ড বা টোকেন পায়নি, তাই অ্যাকাউন্ট এখনো Not connected।',
-      });
-    }
-  }, [rememberActivity, showToast]);
 
   useEffect(() => {
-    const fromUrl = readSpaceFromUrl();
-    const returnedFlag = new URLSearchParams(window.location.search).get('returned') === '1';
-    if (fromUrl) {
-      setSpaceId(fromUrl);
-      setReturned(returnedFlag);
-    }
-    settleReturn();
-
-    const onPopState = () => {
-      setSpaceId(readSpaceFromUrl());
-      setReturned(new URLSearchParams(window.location.search).get('returned') === '1');
-      settleReturn();
+    if (!menuOpen) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
     };
-    window.addEventListener('popstate', onPopState);
-    window.addEventListener('pageshow', settleReturn);
+    document.addEventListener('pointerdown', onPointer);
+    return () => document.removeEventListener('pointerdown', onPointer);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen || aboutOpen ? 'hidden' : '';
     return () => {
-      window.removeEventListener('popstate', onPopState);
-      window.removeEventListener('pageshow', settleReturn);
+      document.body.style.overflow = '';
     };
-  }, [settleReturn]);
+  }, [drawerOpen, aboutOpen]);
 
-  useEffect(() => {
-    const labels: Record<ViewName, string> = {
-      overview: 'Discover',
-      integrations: 'Integrations',
-      activity: 'Activity',
-      settings: 'Settings',
-    };
-    const openName = spaceId ? getIntegration(spaceId)?.name : null;
-    document.title = openName ? `${openName} · Orbit` : `${labels[view]} · Orbit`;
-  }, [view, spaceId]);
-
-  const connectedCount = useMemo(
-    () => integrations.filter((integration) => integration.status === 'connected').length,
-    [],
-  );
-
-  const filteredIntegrations = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return integrations;
-    return integrations.filter((integration) =>
-      `${integration.name} ${integration.description} ${integration.descriptionBn} ${integration.authorizationMethod}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [search]);
-
+  const filtered = useMemo(() => filterSites(category, query), [category, query]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const visible = filtered.slice(start, start + PAGE_SIZE);
+  const savedSet = useMemo(() => new Set(bookmarkIds), [bookmarkIds]);
   const savedSites = useMemo(
-    () => savedSiteIds.map((id) => getDirectorySite(id)).filter((site): site is DirectorySite => Boolean(site)),
-    [savedSiteIds],
+    () => bookmarkIds.map((id) => directorySites.find((site) => site.id === id)).filter((site) => site !== undefined),
+    [bookmarkIds],
   );
 
-  const openSpace = useCallback((integration: AppIntegration) => {
-    setSelectedIntegration(null);
-    setReturned(false);
-    setHelpAutoOpen(false);
-    setSpaceId(integration.id);
-    if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
-  }, []);
+  const scrollToTop = useCallback(() => window.scrollTo({ top: 0, behavior: 'auto' }), []);
 
-  const closeSpace = useCallback(() => {
-    if (window.history.state && 'orbitSpace' in window.history.state) {
-      window.history.back();
-      setHelpAutoOpen(false);
-      return;
-    }
-    writeSpace(null, 'replace');
-    setSpaceId(null);
-    setReturned(false);
-    setHelpAutoOpen(false);
-  }, []);
+  const chooseCategory = (next: CategoryFilter) => {
+    setCategory(next);
+    setPage(1);
+    scrollToTop();
+  };
 
-  const navigate = useCallback((next: ViewName) => {
-    setView(next);
-    if (readSpaceFromUrl() || spaceId) {
-      writeSpace(null, 'replace');
-      setSpaceId(null);
-      setReturned(false);
-      setHelpAutoOpen(false);
-    }
-  }, [spaceId]);
+  const changeQuery = (value: string) => {
+    setQuery(value);
+    setPage(1);
+  };
 
-  const resetDirectory = useCallback(() => {
-    setSearch('');
-    setDirectoryReset((current) => current + 1);
-    navigate('overview');
-  }, [navigate]);
+  const changePage = (next: number) => {
+    setPage(Math.min(Math.max(1, next), totalPages));
+    scrollToTop();
+  };
 
-  const focusDirectorySearch = useCallback(() => {
-    navigate('overview');
-    window.setTimeout(() => document.getElementById('directory-search')?.focus(), 0);
-  }, [navigate]);
+  const resetAll = () => {
+    setCategory(ALL_CATEGORIES);
+    setQuery('');
+    setPage(1);
+    setMenuOpen(false);
+    scrollToTop();
+  };
 
-  const openBookmarks = useCallback(() => setBookmarksOpen(true), []);
-  const closeBookmarks = useCallback(() => setBookmarksOpen(false), []);
-  const openAbout = useCallback(() => setAboutOpen(true), []);
-  const closeAbout = useCallback(() => setAboutOpen(false), []);
-  const navigateToOverview = useCallback(() => navigate('overview'), [navigate]);
+  const toggleBookmark = (id: string) => {
+    setBookmarkIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  };
 
-  const toggleBookmark = useCallback((siteId: string) => {
-    const site = getDirectorySite(siteId);
-    if (!site) return;
-    const isSaved = savedSiteIds.includes(siteId);
-    setSavedSiteIds(isSaved ? savedSiteIds.filter((id) => id !== siteId) : [...savedSiteIds, siteId]);
-    showToast(isSaved
-      ? { title: `${site.name} removed`, description: 'The site was removed from your saved list.' }
-      : { title: `${site.name} saved`, description: 'You can find it in My saved sites.' });
-  }, [savedSiteIds, showToast]);
+  const removeBookmark = (id: string) => setBookmarkIds((current) => current.filter((item) => item !== id));
 
-  const clearBookmarks = useCallback(() => {
-    if (savedSiteIds.length === 0) return;
-    setSavedSiteIds([]);
-    showToast({ title: 'Saved sites cleared', description: 'Your bookmark list is now empty on this device.' });
-  }, [savedSiteIds.length, showToast]);
-
-  const handleToggleTheme = useCallback(() => {
-    setTheme((current) => current === 'light' ? 'dark' : 'light');
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      await signOut();
-      setSelectedIntegration(null);
-      setView('overview');
-    } catch (error) {
-      showToast({
-        title: 'Could not sign out',
-        description: error instanceof Error ? error.message : 'Please try again in a moment.',
-      });
-    }
-  }, [showToast, signOut]);
-
-  const clearActivity = useCallback(() => {
-    setActivity([]);
-    showToast({ title: 'Local history cleared', description: 'Your shortcut activity is removed from this session.' });
-  }, [showToast]);
-
-  const closeDialog = useCallback(() => setSelectedIntegration(null), []);
-
-  if (loading || !user) {
-    return (
-      <AuthPage
-        authConfigured={authConfigured}
-        loading={loading}
-        onSendMagicLink={signInWithEmail}
-        onContinueDemo={continueAsDemo}
-      />
-    );
-  }
-
-  const activeIntegration = getIntegration(spaceId);
+  const clearBookmarks = () => setBookmarkIds([]);
 
   return (
-    <div className="app-shell directory-app-shell">
-      <main className="main-column directory-main-column">
-        <DirectoryHeader
-          view={view}
-          user={user}
-          theme={theme}
-          siteCount={directorySites.length}
-          savedCount={savedSites.length}
-          onNavigate={navigate}
-          onHome={resetDirectory}
-          onToggleTheme={handleToggleTheme}
-          onOpenBookmarks={openBookmarks}
-          onOpenAbout={openAbout}
-          onFocusSearch={focusDirectorySearch}
-          onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          onSignOut={() => void handleSignOut()}
-        />
-        <div className={`main-scroll-area${view === 'overview' && !activeIntegration ? ' directory-overview-scroll' : ''}`}>
-          {activeIntegration ? (
-            <OpenSpaceScreen
-              key={`${activeIntegration.id}${helpAutoOpen ? ':help' : ''}`}
-              integration={activeIntegration}
-              returned={returned}
-              helpInitiallyOpen={helpAutoOpen}
-              onVisit={markVisited}
-              onClose={closeSpace}
+    <div className="app">
+      <header className="topbar">
+        <div className="topbar__inner">
+          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); resetAll(); }} aria-label="Orbit home">
+            <span className="brand__mark" aria-hidden="true">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="2.4" />
+                <circle cx="16" cy="16" r="4.5" fill="currentColor" />
+                <circle cx="27" cy="11" r="2.6" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="brand__name">Orbit</span>
+          </a>
+
+          <div className="search" role="search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => changeQuery(event.target.value)}
+              placeholder="Search sites"
+              aria-label="Search sites"
             />
-          ) : view === 'overview' ? (
-            <DirectoryPage
-              key={directoryReset}
-              search={search}
-              onSearchChange={setSearch}
-              savedSiteIds={savedSiteIds}
-              activity={activity}
-              onVisit={markSiteVisited}
-              onToggleBookmark={toggleBookmark}
-              onGuide={openSpace}
-              onDetails={setSelectedIntegration}
-              onNavigate={() => navigate('integrations')}
-            />
-          ) : view === 'integrations' ? (
-            <IntegrationsPage
-              apps={filteredIntegrations}
-              connectedCount={connectedCount}
-              onVisit={markVisited}
-              onOpen={openSpace}
-              onDetails={setSelectedIntegration}
-              search={search.trim()}
-            />
-          ) : view === 'activity' ? (
-            <ActivityPage activity={activity} onClear={clearActivity} onVisit={markSiteVisited} />
-          ) : (
-            <SettingsPage
-              user={user}
-              authConfigured={authConfigured}
-              theme={theme}
-              onThemeChange={setTheme}
-              onSignOut={() => void handleSignOut()}
-              onDetails={setSelectedIntegration}
-              onClearActivity={clearActivity}
-              activityCount={activity.length}
-              canInstall={canInstall}
-              onInstall={() => void install()}
-            />
+            {query && (
+              <button type="button" className="search__clear" onClick={() => changeQuery('')} aria-label="Clear search">
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="topbar__actions">
+            <button type="button" className="icon-btn bookmark-trigger" onClick={() => setDrawerOpen(true)} aria-label={`Bookmarks (${bookmarkIds.length})`}>
+              <Bookmark size={18} />
+              {bookmarkIds.length > 0 && <span className="badge" aria-hidden="true">{bookmarkIds.length}</span>}
+            </button>
+
+            <div className="menu" ref={menuRef}>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-label="Menu"
+              >
+                <Menu size={18} />
+              </button>
+              {menuOpen && (
+                <div className="menu__panel" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); scrollToTop(); }}>
+                    <ArrowUp size={16} /> Back to top
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setDrawerOpen(true); }}>
+                    <Bookmark size={16} /> Bookmarks
+                  </button>
+                  <button type="button" role="menuitem" onClick={resetAll}>
+                    <RotateCcw size={16} /> Reset filters
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setAboutOpen(true); }}>
+                    <Info size={16} /> About
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container">
+        <section className="intro">
+          <h1>Social directory</h1>
+          <p>{directorySites.length} official websites, grouped by category. Open any site in a new tab.</p>
+        </section>
+
+        <nav className="categories" aria-label="Categories">
+          {(['All', ...directoryCategories] as const).map((item) => {
+            const isAll = item === ALL_CATEGORIES;
+            const count = isAll ? directorySites.length : COUNTS.get(item as SiteCategory) ?? 0;
+            const active = category === item;
+            return (
+              <button
+                key={item}
+                type="button"
+                className={`category-chip${active ? ' is-active' : ''}`}
+                onClick={() => chooseCategory(item)}
+                aria-pressed={active}
+              >
+                {item}
+                <span className="category-chip__count">{count}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="results-bar">
+          <p>
+            {filtered.length === 0
+              ? 'No matching websites'
+              : <>Showing <strong>{start + 1}–{start + visible.length}</strong> of <strong>{filtered.length}</strong> websites</>}
+          </p>
+          {bookmarkIds.length > 0 && (
+            <button type="button" className="text-btn" onClick={() => setDrawerOpen(true)}>
+              View bookmarks ({bookmarkIds.length})
+            </button>
           )}
         </div>
+
+        {visible.length > 0 ? (
+          <div className="grid">
+            {visible.map((site) => (
+              <SiteCard key={site.id} site={site} saved={savedSet.has(site.id)} onToggleBookmark={toggleBookmark} />
+            ))}
+          </div>
+        ) : (
+          <div className="empty">
+            <Search size={28} aria-hidden="true" />
+            <h2>No websites found</h2>
+            <p>Try another word or choose a different category.</p>
+            <button type="button" className="primary-btn" onClick={resetAll}>Show all websites</button>
+          </div>
+        )}
+
+        <Pagination page={currentPage} total={totalPages} onChange={changePage} />
       </main>
 
-      <button
-        type="button"
-        className="directory-floating-bookmark"
-        onClick={openBookmarks}
-        aria-label={`Open saved sites, ${savedSites.length} saved`}
-        title="My saved sites"
-      >
-        <Bookmark size={18} fill="currentColor" />
-        <span>{savedSites.length}</span>
-        <small>Saved</small>
-      </button>
+      <footer className="footer">
+        <span>Orbit</span>
+        <span>Saved sites stay on this device.</span>
+      </footer>
 
       <BookmarkDrawer
-        open={bookmarksOpen}
+        open={drawerOpen}
         sites={savedSites}
-        onClose={closeBookmarks}
-        onRemove={toggleBookmark}
+        onClose={() => setDrawerOpen(false)}
+        onRemove={removeBookmark}
         onClear={clearBookmarks}
-        onVisit={markSiteVisited}
-        onExplore={navigateToOverview}
       />
-      <AboutDialog
-        open={aboutOpen}
-        siteCount={directorySites.length}
-        integrationCount={integrations.length}
-        onClose={closeAbout}
-        onNavigate={navigateToOverview}
-      />
-      <IntegrationDialog
-        integration={selectedIntegration}
-        onClose={closeDialog}
-        onVisit={markVisited}
-        onGuide={openSpace}
-      />
-      <Toast
-        message={toast}
-        onDismiss={() => setToast(null)}
-        {...(spaceId
-          ? { onBack: () => { setToast(null); navigate('overview'); }, backLabel: 'ড্যাশবোর্ডে যান' }
-          : {})}
-      />
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }

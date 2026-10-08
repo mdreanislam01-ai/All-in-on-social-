@@ -1,19 +1,14 @@
 {
-  "name": "orbit-social-dashboard",
+  "name": "orbit-directory",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "verify:links": "vite build --ssr scripts/verify-open-links.tsx --outDir .verify --logLevel warn && node .verify/verify-open-links.js"
+    "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@fontsource/dm-sans": "^5.3.0",
-    "@fontsource/manrope": "^5.3.0",
-    "@fontsource/noto-sans-bengali": "^5.3.0",
-    "@supabase/supabase-js": "^2.117.2",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
