@@ -6,7 +6,7 @@ import { OpenSpaceScreen } from './components/OpenSpaceScreen';
 import { Toast, type ToastMessage } from './components/Toast';
 import { TopBar } from './components/TopBar';
 import { getIntegration, integrations } from './integrations/registry';
-import { clearReturn, peekReturn } from './integrations/launch';
+import { consumeReturn, SWALLOWED_TAP_MS } from './integrations/launch';
 import type { ActivityEntry, AppIntegration, IntegrationId } from './integrations/types';
 import { usePwaInstall } from './hooks/usePwaInstall';
 import { ActivityPage } from './pages/ActivityPage';
@@ -56,6 +56,8 @@ export function App() {
   const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
   const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
   const [returned, setReturned] = useState(false);
+  /** True when the open screen should start with its help panel expanded. */
+  const [helpAutoOpen, setHelpAutoOpen] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -108,16 +110,30 @@ export function App() {
    * a quiet note on the dashboard. Neither path touches connection status.
    */
   const settleReturn = useCallback(() => {
-    const pending = peekReturn();
+    const pending = consumeReturn();
     if (!pending) return;
     const integration = getIntegration(pending.id);
-    clearReturn();
-    if (integration) rememberActivity(integration, 'returned');
-    if (integration && readSpaceFromUrl() === pending.id) {
+    if (!integration) return;
+    rememberActivity(integration, 'returned');
+    if (pending.awayMs < SWALLOWED_TAP_MS) {
+      // Back within seconds of a same-tab tap means the site never opened: an
+      // app link or the in-app browser swallowed it. Not a visit — so no
+      // "welcome back"; instead the guide screen opens itself at the fix steps.
+      setHelpAutoOpen(true);
+      setSpaceId(pending.id);
+      setReturned(false);
+      // Always replace: this normalizes any `?returned=1` the reserved history
+      // entry left behind, since this was no visit.
+      writeSpace(pending.id, 'replace');
+      showToast({
+        title: `${integration.name} খোলেনি বলে মনে হচ্ছে`,
+        description: 'সাইটে যাওয়ার আগেই ফিরে এসেছেন — ফোন সম্ভবত লিংকটা গিলে ফেলেছে। নিচের “খুলতে সমস্যা হচ্ছে?” ধাপগুলো দেখুন।',
+      });
+    } else if (readSpaceFromUrl() === pending.id) {
       setSpaceId(pending.id);
       setReturned(true);
       writeSpace(pending.id, 'replace');
-    } else if (integration) {
+    } else {
       showToast({
         title: `${integration.name} থেকে ফিরে এসেছেন`,
         description: 'লগইন অফিসিয়াল সাইটেই আছে। Orbit কোনো পাসওয়ার্ড বা টোকেন পায়নি, তাই অ্যাকাউন্ট এখনো Not connected।',
@@ -181,6 +197,7 @@ export function App() {
   const openSpace = useCallback((integration: AppIntegration) => {
     setSelectedIntegration(null);
     setReturned(false);
+    setHelpAutoOpen(false);
     setSpaceId(integration.id);
     if (readSpaceFromUrl() !== integration.id) writeSpace(integration.id, 'push');
   }, []);
@@ -188,11 +205,13 @@ export function App() {
   const closeSpace = useCallback(() => {
     if (window.history.state && 'orbitSpace' in window.history.state) {
       window.history.back();
+      setHelpAutoOpen(false);
       return;
     }
     writeSpace(null, 'replace');
     setSpaceId(null);
     setReturned(false);
+    setHelpAutoOpen(false);
   }, []);
 
   const navigate = useCallback((next: ViewName) => {
@@ -201,6 +220,7 @@ export function App() {
       writeSpace(null, 'replace');
       setSpaceId(null);
       setReturned(false);
+      setHelpAutoOpen(false);
     }
   }, [spaceId]);
 
@@ -267,8 +287,10 @@ export function App() {
         <div className="main-scroll-area">
           {activeIntegration ? (
             <OpenSpaceScreen
+              key={`${activeIntegration.id}${helpAutoOpen ? ':help' : ''}`}
               integration={activeIntegration}
               returned={returned}
+              helpInitiallyOpen={helpAutoOpen}
               onVisit={markVisited}
               onClose={closeSpace}
             />

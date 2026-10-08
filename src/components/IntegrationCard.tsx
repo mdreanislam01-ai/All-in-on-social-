@@ -40,6 +40,16 @@ export function IntegrationCard({
           className="button button-open"
           onVisit={onVisit}
         />
+        {/* Always plain HTTPS: on Android the primary may be a Chrome intent,
+            so this neighbour is what long-press/copy-link/share can trust. */}
+        <OpenSiteLink
+          integration={integration}
+          mode="new-tab"
+          label="নতুন ট্যাবে"
+          className="text-button card-newtab"
+          withIcon={false}
+          onVisit={onVisit}
+        />
         <button
           type="button"
           className="button button-quiet button-guides"

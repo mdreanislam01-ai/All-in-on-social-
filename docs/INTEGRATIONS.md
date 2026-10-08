@@ -2,10 +2,19 @@
 
 Every provider used by Orbit refuses to be framed, so the app has no iframe at all: there is nothing to probe, nothing that can render a grey broken page, and no claim that a provider site is "running inside Orbit". Each card, dialog and open screen renders the provider's official HTTPS address as a plain `<a href>`.
 
-Two open behaviours are intentional:
+Three open behaviours are intentional:
 
-- **Same tab (primary, `{name} খুলুন`)** — no `target`, no `window.open`, no `intent://`. The browser Back button is the return path, which is why `prepareSameTabOpen()` reserves one Orbit history entry before the click is allowed to navigate when the open screen itself is the caller.
-- **New tab (`নতুন ট্যাবে খুলুন`)** — `target="_blank" rel="noopener noreferrer"`, so Orbit stays open behind it. This is also the recommended path when Orbit runs as an installed PWA, where no Back button exists.
+- **Same tab (primary, `{name} খুলুন`)** — no `target`, no `window.open`. The browser Back button is the return path, which is why `prepareSameTabOpen()` reserves one Orbit history entry before the click is allowed to navigate when the open screen itself is the caller.
+- **New tab (`নতুন ট্যাবে খুলুন`)** — `target="_blank" rel="noopener noreferrer"`, so Orbit stays open behind it. This is also the recommended path when Orbit runs as an installed PWA, where no Back button exists. New-tab hrefs are always plain HTTPS; beside each card's primary a plain **নতুন ট্যাবে** link exists so long-press/copy-link can never copy an intent string.
+- **Android Chrome intent (Facebook and TikTok only)** — those providers' Android apps hijack taps on their own web addresses, so on Android their same-tab href is `intent://<host-and-path>#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=<encoded URL>;end`, pinning the open to Chrome (`sameTabHref()` / `shouldForceChrome()` / `androidChromeIntent()` in `launch.ts`). It is per-device and reversible via the open-screen switch **আমি অ্যাপেই খুলতে চাই** (localStorage `orbit-force-chrome`). Desktop, iOS and non-hijacking services never see an intent; inside another app's in-app browser an extra intent escape hatch is offered only when the primary is not already one. If an intent tap goes nowhere — page still visible 1.4s later — the button flags **খোলে না?** and the fix panel opens.
+
+## Phone reality, addressed instead of hidden
+
+Each registry entry declares `appHijacksLinks` (Facebook and TikTok only), `browserUrl` (TikTok's official `https://www.tiktok.com/explore` — `openUrlFor()` accepts it only because it shares `providerUrl`'s origin and falls back otherwise; no third-party viewer/scraper will ever pass that guard), and Bengali `phoneIssueBn`/`phoneFixBn`: the real cause and the real fix, e.g. Android *Settings → Apps → ‹app› → Open by default → Open supported links → Don't open*, Chrome *⋮ → Desktop site*, and the fact that Messenger's "অ্যাপ নামাও" wall is Meta's own behaviour, not Orbit. These render as the **খুলতে সমস্যা হচ্ছে?** panel on the open screen, which also opens automatically when a tap is swallowed.
+
+Two per-device switches live on the open screen (`localStorage`): **আমি অ্যাপেই খুলতে চাই** (`orbit-force-chrome`) and **মূল ঠিকানা ব্যবহার করুন** (`orbit-web-browser-mode`). With both switches off, TikTok opens exactly `https://www.tiktok.com/` again. The “যে ঠিকানায় খুলবে” box always displays — and the copy button always copies — the precise URL the buttons will navigate to on this device.
+
+A same-tab tap that brings you back within `SWALLOWED_TAP_MS` (12 seconds) is a tap the phone swallowed, not a visit: `consumeReturn()` reports `{ id, awayMs }`, and App.tsx reopens the guide screen at its fix panel with a toast instead of a "welcome back".
 
 Orbit never proxies a provider, never strips `X-Frame-Options` or CSP `frame-ancestors`, never reproduces a login page, and never asks for or stores a social password. A visit is never treated as an API connection: `status` in the registry is static and only a verified provider callback could ever change it.
 
@@ -37,9 +46,9 @@ A production adapter should:
 
 ## Adding a platform
 
-A new service is one registry entry: `id`, `name`, `description`, `descriptionBn`, `providerUrl`, accents, official method/features/limits, `openNoteBn`, `returnNoteBn`, `officialDocsUrl`, and `status: 'not-connected'`. Then add its `BrandIcon` glyph plus `.mark-<id>`/`.float-<id>` styles. Everything else — cards, open screen, dialog, settings list, activity, auth art, counts — reads from the registry, which is why YouTube needed no new UI code.
+A new service is one registry entry: `id`, `name`, `description`, `descriptionBn`, `providerUrl`, `phoneIssueBn`, `phoneFixBn`, accents, official method/features/limits, `openNoteBn`, `returnNoteBn`, `officialDocsUrl`, and `status: 'not-connected'` — plus `browserUrl` (same-origin official alternate address) and `appHijacksLinks: true` only if the provider's app provably intercepts its web links. Then add its `BrandIcon` glyph plus `.mark-<id>`/`.float-<id>` styles. Everything else — cards, open screen, dialog, settings list, activity, auth art, counts — reads from the registry, which is why YouTube needed no new UI code.
 
-`npm run verify:links` (`scripts/verify-open-links.tsx`) asserts the rules for every registry entry: exact official `href`, primary link with no `target`, no iframe, no password input, no `intent://` outside an in-app browser, and no "inside Orbit" wording. Add the new address to its `expected` map so a typo in `providerUrl` fails the build.
+`npm run verify:links` (`scripts/verify-open-links.tsx`) asserts the rules for every registry entry: exact official primary `href` (or the official `browserUrl` where one exists), primary link with no `target`, no iframe, no password input, no "inside Orbit" wording, every anchor limited to official open URLs / their Android Chrome intent wrapper / official docs hosts, `intent://` only for `appHijacksLinks` services on Android and never on desktop or iOS, plain HTTPS once forcing is switched off, and TikTok opening exactly `https://www.tiktok.com/` with both switches off. Add the new address to its `expected` map so a typo in `providerUrl` fails the build.
 
 ## Third-party service accounts are never website passwords
 
