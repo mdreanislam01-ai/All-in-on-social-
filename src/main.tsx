@@ -16,6 +16,15 @@ import { AuthProvider } from './auth/AuthProvider';
 import { App } from './App';
 import './styles.css';
 
+try {
+  const savedTheme = localStorage.getItem('orbit-theme') === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = savedTheme;
+  document.documentElement.style.colorScheme = savedTheme;
+} catch {
+  document.documentElement.dataset.theme = 'dark';
+  document.documentElement.style.colorScheme = 'dark';
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>

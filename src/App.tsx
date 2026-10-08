@@ -1,29 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bookmark } from 'lucide-react';
 import { useAuth } from './auth/AuthProvider';
+import { AboutDialog } from './components/AboutDialog';
+import { BookmarkDrawer } from './components/BookmarkDrawer';
+import { DirectoryHeader } from './components/DirectoryHeader';
 import { IntegrationDialog } from './components/IntegrationDialog';
-import { MobileNavigation, Sidebar, type ViewName } from './components/Sidebar';
 import { OpenSpaceScreen } from './components/OpenSpaceScreen';
 import { Toast, type ToastMessage } from './components/Toast';
-import { TopBar } from './components/TopBar';
-import { getIntegration, integrations } from './integrations/registry';
 import { consumeReturn, SWALLOWED_TAP_MS } from './integrations/launch';
+import { getIntegration, integrations } from './integrations/registry';
 import type { ActivityEntry, AppIntegration, IntegrationId } from './integrations/types';
 import { usePwaInstall } from './hooks/usePwaInstall';
+import { directorySites, getDirectorySite, type DirectorySite } from './directory/catalog';
+import type { ViewName } from './components/Sidebar';
 import { ActivityPage } from './pages/ActivityPage';
 import { AuthPage } from './pages/AuthPage';
+import { DirectoryPage } from './pages/DirectoryPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
-import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 type ColorTheme = 'light' | 'dark';
 type SpaceId = IntegrationId;
 
-/**
- * Orbit owns exactly one piece of state per provider visit: which instruction
- * screen is open, and whether the person just came back. Connection status
- * lives in the registry and is never written from here, so a visit can never
- * mark an account as connected.
- */
 function readSpaceFromUrl(): SpaceId | null {
   const value = new URLSearchParams(window.location.search).get('space');
   return value && integrations.some((integration) => integration.id === value) ? (value as SpaceId) : null;
@@ -42,9 +40,21 @@ function writeSpace(id: SpaceId | null, mode: 'push' | 'replace') {
 
 function readSavedTheme(): ColorTheme {
   try {
-    return localStorage.getItem('orbit-theme') === 'dark' ? 'dark' : 'light';
+    return localStorage.getItem('orbit-theme') === 'light' ? 'light' : 'dark';
   } catch {
-    return 'light';
+    return 'dark';
+  }
+}
+
+function readSavedSiteIds(): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem('orbit-saved-sites') ?? '[]');
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.filter((id): id is string =>
+      typeof id === 'string' && directorySites.some((site) => site.id === id),
+    ))];
+  } catch {
+    return [];
   }
 }
 
@@ -52,22 +62,24 @@ export function App() {
   const { user, loading, authConfigured, signInWithEmail, continueAsDemo, signOut } = useAuth();
   const [view, setView] = useState<ViewName>('overview');
   const [search, setSearch] = useState('');
+  const [directoryReset, setDirectoryReset] = useState(0);
   const [theme, setTheme] = useState<ColorTheme>(readSavedTheme);
   const [selectedIntegration, setSelectedIntegration] = useState<AppIntegration | null>(null);
   const [spaceId, setSpaceId] = useState<SpaceId | null>(null);
   const [returned, setReturned] = useState(false);
-  /** True when the open screen should start with its help panel expanded. */
   const [helpAutoOpen, setHelpAutoOpen] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [savedSiteIds, setSavedSiteIds] = useState<string[]>(readSavedSiteIds);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const toastTimer = useRef<number | undefined>(undefined);
   const { canInstall, install } = usePwaInstall();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#111521' : '#f6f7fb');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0b0a1b' : '#f6f7fb');
     try {
       localStorage.setItem('orbit-theme', theme);
     } catch {
@@ -76,12 +88,22 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
-    return () => window.clearTimeout(toastTimer.current);
-  }, []);
+    try {
+      localStorage.setItem('orbit-saved-sites', JSON.stringify(savedSiteIds));
+    } catch {
+      // Bookmarks remain usable for this session if storage is unavailable.
+    }
+  }, [savedSiteIds]);
 
   useEffect(() => {
-    setSidebarOpen(false);
-  }, [view]);
+    const syncSavedSites = (event: StorageEvent) => {
+      if (event.key === 'orbit-saved-sites') setSavedSiteIds(readSavedSiteIds());
+    };
+    window.addEventListener('storage', syncSavedSites);
+    return () => window.removeEventListener('storage', syncSavedSites);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   const showToast = useCallback((message: ToastMessage) => {
     setToast(message);
@@ -89,11 +111,13 @@ export function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 6200);
   }, []);
 
-  const rememberActivity = useCallback((integration: AppIntegration, action: ActivityEntry['action']) => {
+  const rememberActivity = useCallback((siteId: string, action: ActivityEntry['action']) => {
+    const site = getDirectorySite(siteId);
+    if (!site) return;
     setActivity((current) => [
       {
-        id: `${integration.id}-${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        integrationId: integration.id,
+        id: `${siteId}-${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        siteId,
         action,
         createdAt: new Date().toISOString(),
       },
@@ -101,29 +125,25 @@ export function App() {
     ].slice(0, 30));
   }, []);
 
-  /**
-   * Landing back on Orbit after an official-site visit. Two signals, because
-   * phones do both: the history entry the open screen reserved (popstate with
-   * ?space&id&returned=1) and, after a real reload, the short-lived
-   * sessionStorage marker (pageshow). The first visit detection is also what
-   * fires when a card link is used — then there is no screen to reopen, just
-   * a quiet note on the dashboard. Neither path touches connection status.
-   */
+  /** A provider visit is not an OAuth callback and never changes connection status. */
+  const markVisited = useCallback((integration: AppIntegration) => {
+    rememberActivity(integration.id, 'opened');
+  }, [rememberActivity]);
+
+  const markSiteVisited = useCallback((site: DirectorySite) => {
+    rememberActivity(site.id, 'opened');
+  }, [rememberActivity]);
+
   const settleReturn = useCallback(() => {
     const pending = consumeReturn();
     if (!pending) return;
     const integration = getIntegration(pending.id);
     if (!integration) return;
-    rememberActivity(integration, 'returned');
+    rememberActivity(pending.id, 'returned');
     if (pending.awayMs < SWALLOWED_TAP_MS) {
-      // Back within seconds of a same-tab tap means the site never opened: an
-      // app link or the in-app browser swallowed it. Not a visit — so no
-      // "welcome back"; instead the guide screen opens itself at the fix steps.
       setHelpAutoOpen(true);
       setSpaceId(pending.id);
       setReturned(false);
-      // Always replace: this normalizes any `?returned=1` the reserved history
-      // entry left behind, since this was no visit.
       writeSpace(pending.id, 'replace');
       showToast({
         title: `${integration.name} খোলেনি বলে মনে হচ্ছে`,
@@ -165,7 +185,7 @@ export function App() {
 
   useEffect(() => {
     const labels: Record<ViewName, string> = {
-      overview: 'Overview',
+      overview: 'Discover',
       integrations: 'Integrations',
       activity: 'Activity',
       settings: 'Settings',
@@ -189,10 +209,10 @@ export function App() {
     );
   }, [search]);
 
-  /** A clicked open link is only a local shortcut record — never a login event. */
-  const markVisited = useCallback((integration: AppIntegration) => {
-    rememberActivity(integration, 'opened');
-  }, [rememberActivity]);
+  const savedSites = useMemo(
+    () => savedSiteIds.map((id) => getDirectorySite(id)).filter((site): site is DirectorySite => Boolean(site)),
+    [savedSiteIds],
+  );
 
   const openSpace = useCallback((integration: AppIntegration) => {
     setSelectedIntegration(null);
@@ -223,6 +243,39 @@ export function App() {
       setHelpAutoOpen(false);
     }
   }, [spaceId]);
+
+  const resetDirectory = useCallback(() => {
+    setSearch('');
+    setDirectoryReset((current) => current + 1);
+    navigate('overview');
+  }, [navigate]);
+
+  const focusDirectorySearch = useCallback(() => {
+    navigate('overview');
+    window.setTimeout(() => document.getElementById('directory-search')?.focus(), 0);
+  }, [navigate]);
+
+  const openBookmarks = useCallback(() => setBookmarksOpen(true), []);
+  const closeBookmarks = useCallback(() => setBookmarksOpen(false), []);
+  const openAbout = useCallback(() => setAboutOpen(true), []);
+  const closeAbout = useCallback(() => setAboutOpen(false), []);
+  const navigateToOverview = useCallback(() => navigate('overview'), [navigate]);
+
+  const toggleBookmark = useCallback((siteId: string) => {
+    const site = getDirectorySite(siteId);
+    if (!site) return;
+    const isSaved = savedSiteIds.includes(siteId);
+    setSavedSiteIds(isSaved ? savedSiteIds.filter((id) => id !== siteId) : [...savedSiteIds, siteId]);
+    showToast(isSaved
+      ? { title: `${site.name} removed`, description: 'The site was removed from your saved list.' }
+      : { title: `${site.name} saved`, description: 'You can find it in My saved sites.' });
+  }, [savedSiteIds, showToast]);
+
+  const clearBookmarks = useCallback(() => {
+    if (savedSiteIds.length === 0) return;
+    setSavedSiteIds([]);
+    showToast({ title: 'Saved sites cleared', description: 'Your bookmark list is now empty on this device.' });
+  }, [savedSiteIds.length, showToast]);
 
   const handleToggleTheme = useCallback(() => {
     setTheme((current) => current === 'light' ? 'dark' : 'light');
@@ -262,29 +315,24 @@ export function App() {
   const activeIntegration = getIntegration(spaceId);
 
   return (
-    <div className="app-shell">
-      <Sidebar
-        view={view}
-        onNavigate={navigate}
-        user={user}
-        onSignOut={() => void handleSignOut()}
-        onClose={() => setSidebarOpen(false)}
-        open={sidebarOpen}
-        integrationCount={integrations.length}
-      />
-      <main className="main-column">
-        <TopBar
+    <div className="app-shell directory-app-shell">
+      <main className="main-column directory-main-column">
+        <DirectoryHeader
           view={view}
           user={user}
           theme={theme}
-          onToggleTheme={handleToggleTheme}
-          search={search}
-          onSearchChange={setSearch}
+          siteCount={directorySites.length}
+          savedCount={savedSites.length}
           onNavigate={navigate}
+          onHome={resetDirectory}
+          onToggleTheme={handleToggleTheme}
+          onOpenBookmarks={openBookmarks}
+          onOpenAbout={openAbout}
+          onFocusSearch={focusDirectorySearch}
+          onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           onSignOut={() => void handleSignOut()}
-          onOpenSidebar={() => setSidebarOpen(true)}
         />
-        <div className="main-scroll-area">
+        <div className={`main-scroll-area${view === 'overview' && !activeIntegration ? ' directory-overview-scroll' : ''}`}>
           {activeIntegration ? (
             <OpenSpaceScreen
               key={`${activeIntegration.id}${helpAutoOpen ? ':help' : ''}`}
@@ -294,19 +342,20 @@ export function App() {
               onVisit={markVisited}
               onClose={closeSpace}
             />
-          ) : view === 'overview' && (
-            <OverviewPage
-              name={user.name}
-              apps={filteredIntegrations}
-              connectedCount={connectedCount}
-              onVisit={markVisited}
-              onOpen={openSpace}
+          ) : view === 'overview' ? (
+            <DirectoryPage
+              key={directoryReset}
+              search={search}
+              onSearchChange={setSearch}
+              savedSiteIds={savedSiteIds}
+              activity={activity}
+              onVisit={markSiteVisited}
+              onToggleBookmark={toggleBookmark}
+              onGuide={openSpace}
               onDetails={setSelectedIntegration}
-              onNavigate={() => setView('integrations')}
-              search={search.trim()}
+              onNavigate={() => navigate('integrations')}
             />
-          )}
-          {!spaceId && view === 'integrations' && (
+          ) : view === 'integrations' ? (
             <IntegrationsPage
               apps={filteredIntegrations}
               connectedCount={connectedCount}
@@ -315,15 +364,9 @@ export function App() {
               onDetails={setSelectedIntegration}
               search={search.trim()}
             />
-          )}
-          {!spaceId && view === 'activity' && (
-            <ActivityPage
-              activity={activity}
-              onClear={clearActivity}
-              onVisit={markVisited}
-            />
-          )}
-          {!spaceId && view === 'settings' && (
+          ) : view === 'activity' ? (
+            <ActivityPage activity={activity} onClear={clearActivity} onVisit={markSiteVisited} />
+          ) : (
             <SettingsPage
               user={user}
               authConfigured={authConfigured}
@@ -338,8 +381,36 @@ export function App() {
             />
           )}
         </div>
-        <MobileNavigation view={view} onNavigate={setView} />
       </main>
+
+      <button
+        type="button"
+        className="directory-floating-bookmark"
+        onClick={openBookmarks}
+        aria-label={`Open saved sites, ${savedSites.length} saved`}
+        title="My saved sites"
+      >
+        <Bookmark size={18} fill="currentColor" />
+        <span>{savedSites.length}</span>
+        <small>Saved</small>
+      </button>
+
+      <BookmarkDrawer
+        open={bookmarksOpen}
+        sites={savedSites}
+        onClose={closeBookmarks}
+        onRemove={toggleBookmark}
+        onClear={clearBookmarks}
+        onVisit={markSiteVisited}
+        onExplore={navigateToOverview}
+      />
+      <AboutDialog
+        open={aboutOpen}
+        siteCount={directorySites.length}
+        integrationCount={integrations.length}
+        onClose={closeAbout}
+        onNavigate={navigateToOverview}
+      />
       <IntegrationDialog
         integration={selectedIntegration}
         onClose={closeDialog}

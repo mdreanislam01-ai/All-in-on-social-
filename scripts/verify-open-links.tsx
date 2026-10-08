@@ -19,6 +19,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { OpenSpaceScreen } from '../src/components/OpenSpaceScreen';
 import { IntegrationCard } from '../src/components/IntegrationCard';
 import { IntegrationDialog } from '../src/components/IntegrationDialog';
+import { DirectorySiteLink } from '../src/components/DirectorySiteLink';
+import { DirectoryPage } from '../src/pages/DirectoryPage';
+import { directorySites } from '../src/directory/catalog';
 import { integrations } from '../src/integrations/registry';
 import {
   androidChromeIntent,
@@ -143,6 +146,66 @@ function isAllowedAnchor(anchor: Anchor, integration: (typeof integrations)[numb
     return false;
   }
 }
+
+check('directory has 45 curated sites across multiple pages', directorySites.length === 45);
+check('each directory site has an HTTPS destination on its declared domain', directorySites.every((site) => {
+  try {
+    const url = new URL(site.url);
+    return url.protocol === 'https:' && (url.hostname === site.domain || url.hostname.endsWith(`.${site.domain}`));
+  } catch {
+    return false;
+  }
+}));
+check('guided directory entries map to all five existing integrations',
+  directorySites.filter((site) => site.integrationId).length === integrations.length
+  && integrations.every((integration) => directorySites.some((site) => site.integrationId === integration.id && site.url === integration.providerUrl)));
+
+for (const site of directorySites) {
+  const integration = site.integrationId ? integrations.find((entry) => entry.id === site.integrationId) : undefined;
+  const desktopMarkup = withEnv(CHROME_DESKTOP, () => renderToStaticMarkup(
+    <DirectorySiteLink site={site} label="Open site" onVisit={() => undefined} />,
+  ));
+  const desktopAnchor = anchors(desktopMarkup)[0];
+  if (integration) {
+    const openUrl = integration.browserUrl ?? integration.providerUrl;
+    check(`${site.name}: directory uses a real same-tab provider link`, desktopAnchor?.href === openUrl && !desktopAnchor.target);
+    const androidMarkup = withEnv(CHROME_ANDROID, () => renderToStaticMarkup(
+      <DirectorySiteLink site={site} label="Open site" onVisit={() => undefined} />,
+    ));
+    const androidAnchor = anchors(androidMarkup)[0];
+    const androidExpected = withEnv(CHROME_ANDROID, () => sameTabHref(integration));
+    check(`${site.name}: Android directory link follows the provider-specific safe href`,
+      androidAnchor?.href === androidExpected && !androidAnchor.target);
+  } else {
+    check(`${site.name}: opens its official HTTPS destination in a safe new tab`,
+      desktopAnchor?.href === site.url && desktopAnchor.target === '_blank' && desktopAnchor.rel === 'noopener noreferrer');
+  }
+  check(`${site.name}: no intent URL appears in the desktop directory link`, !desktopMarkup.includes('intent://'));
+}
+
+const directoryMarkup = withEnv(CHROME_DESKTOP, () => renderToStaticMarkup(
+  <DirectoryPage
+    search=""
+    onSearchChange={() => undefined}
+    savedSiteIds={[]}
+    activity={[]}
+    onVisit={() => undefined}
+    onToggleBookmark={() => undefined}
+    onGuide={() => undefined}
+    onDetails={() => undefined}
+    onNavigate={() => undefined}
+  />,
+));
+check('directory renders the first 12 cards and an active page control',
+  [...directoryMarkup.matchAll(/class="directory-card"/g)].length === 12
+  && directoryMarkup.includes('aria-label="Page 1"') && directoryMarkup.includes('aria-label="Page 2"'));
+check('directory renders search, category filters, sorting and an official-site notice',
+  directoryMarkup.includes('id="directory-search"')
+  && directoryMarkup.includes('BROWSE BY CATEGORY')
+  && directoryMarkup.includes('aria-label="Sort sites"')
+  && directoryMarkup.includes('Always the real destination.'));
+check('directory renders no iframes or third-party password fields',
+  !directoryMarkup.includes('<iframe') && !directoryMarkup.includes('type="password"'));
 
 check('registry ships 5 services including YouTube', integrations.length === 5 && integrations.some((i) => i.id === 'youtube'));
 check('swallowed-tap window is exported as 12s', SWALLOWED_TAP_MS === 12_000);
