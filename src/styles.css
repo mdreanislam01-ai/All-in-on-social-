@@ -128,8 +128,9 @@ h1, h2, h3, p { margin: 0; }
 
 .site-logo {
   position: relative; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px;
-  background: var(--surface-2); overflow: hidden;
+  background: #ffffff; border: 1px solid var(--line); overflow: hidden;
 }
+.site-logo svg { display: block; }
 .site-logo img { display: block; object-fit: contain; }
 .site-logo--mark { background: var(--site-accent, var(--accent)); color: #fff; font-weight: 750; font-size: 14px; text-transform: uppercase; }
 
