@@ -57,7 +57,8 @@ export interface AppIntegration {
 
 export interface ActivityEntry {
   id: string;
-  integrationId: IntegrationId;
+  /** Directory site ID, including the five guided integrations. */
+  siteId: string;
   action: 'opened' | 'returned';
   createdAt: string;
 }
