@@ -2,7 +2,7 @@
  * Bump this on every release that changes the shell or navigation. Activation
  * deletes every other cache so an installed copy drops its previous app shell.
  */
-const CACHE_NAME = 'orbit-shell-v4';
+const CACHE_NAME = 'orbit-shell-v5';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/orbit-192.png', '/icons/orbit-512.png'];
 
 self.addEventListener('install', (event) => {
